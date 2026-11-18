@@ -1,1 +1,1496 @@
 
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mano Clip Tool — AI Viral Clipping & B-Roll Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Montserrat:ital,wght@0,800;0,900;1,900&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Montserrat', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #070b14;
+      color: #f8fafc;
+      overflow-x: hidden;
+    }
+    .sapphire-sidebar {
+      background-color: #0b1120;
+      border-right: 1px solid rgba(56, 189, 248, 0.14);
+    }
+    .sapphire-card {
+      background-color: #0f172a;
+      border: 1px solid rgba(56, 189, 248, 0.16);
+    }
+    .sapphire-input {
+      background-color: #080d1a;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+    }
+    .sapphire-input:focus {
+      border-color: #10b981;
+      outline: none;
+    }
+    .emerald-cyan-btn {
+      background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+    }
+    .emerald-cyan-btn:hover {
+      background: linear-gradient(135deg, #059669 0%, #0891b2 100%);
+    }
+    @keyframes captionPop {
+      0% { transform: scale(0.86); opacity: 0.4; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .caption-pop {
+      animation: captionPop 0.16s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #070b14; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 9999px; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
+
+  <!-- Hidden File Input for Uploading Video / Opening Folder -->
+  <input type="file" id="videoUploadInput" accept="video/mp4,video/webm,video/quicktime,video/*" class="hidden" onchange="handleRealVideoUpload(event)" />
+
+  <!-- Non-blocking Toast Message Box -->
+  <div id="toastBox" class="fixed bottom-5 right-5 z-50 transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none">
+    <div class="bg-[#0f172a] px-4 py-3 rounded-2xl shadow-2xl border border-emerald-400/40 flex items-center gap-3">
+      <span class="w-6 h-6 rounded-full emerald-cyan-btn text-slate-950 flex items-center justify-center text-xs font-black">✓</span>
+      <span id="toastText" class="text-sm font-semibold text-white">Ready</span>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- VIEW 1: EXACT SIDEBAR & PROJECTS DASHBOARD (Matching Capture 1)       -->
+  <!-- ===================================================================== -->
+  <div id="dashboardView" class="flex-1 flex flex-col md:flex-row min-h-screen">
+    
+    <!-- Left Fixed Sidebar (260px on Desktop, Exact Capture 1 Structure) -->
+    <aside class="w-full md:w-[260px] sapphire-sidebar p-4 flex flex-col justify-between shrink-0">
+      <div class="space-y-4">
+        <!-- Brand Logo & Title -->
+        <div class="flex items-center gap-2.5 px-1 pt-1">
+          <div class="w-8 h-8 rounded-lg emerald-cyan-btn flex items-center justify-center shadow-lg shadow-emerald-500/25">
+            <svg class="w-4 h-4 text-slate-950" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M4 6a2 2 0 012-2h2v16H6a2 2 0 01-2-2V6zm6-2h4v16h-4V4zm6 0h2a2 2 0 012 2v12a2 2 0 01-2 2h-2V4z"/>
+            </svg>
+          </div>
+          <span class="font-extrabold text-[15px] tracking-tight text-white">Mano Clip Tool</span>
+        </div>
+
+        <!-- Prominent Full-Width White "+ New Project" Button -->
+        <button onclick="openNewProjectModal()" class="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-slate-100 text-slate-950 font-extrabold text-sm transition flex items-center justify-center gap-2 shadow-md cursor-pointer">
+          <span class="text-lg leading-none font-bold">+</span>
+          <span>New Project</span>
+        </button>
+
+        <!-- Exact 3 Sidebar Navigation Items (Projects, Open Folder, Settings) -->
+        <nav class="flex md:flex-col gap-1 pt-1">
+          <button id="sideNavProjects" onclick="setSidebarActive('projects')" class="flex-1 md:flex-none flex items-center gap-3 px-3 py-2.5 rounded-xl bg-cyan-500/15 text-white border border-cyan-400/30 text-sm font-semibold transition cursor-pointer">
+            <svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <rect x="3" y="4" width="7" height="16" rx="1.5" />
+              <rect x="14" y="4" width="7" height="16" rx="1.5" />
+            </svg>
+            <span>Projects</span>
+          </button>
+
+          <button id="sideNavFolder" onclick="triggerOpenFolder()" class="flex-1 md:flex-none flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 text-sm font-medium transition cursor-pointer">
+            <svg class="w-4 h-4 text-cyan-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            <span>Open Folder</span>
+          </button>
+
+          <button id="sideNavSettings" onclick="openSettingsModal()" class="flex-1 md:flex-none flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 text-sm font-medium transition cursor-pointer">
+            <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            <span>Settings</span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Bottom Card + Engine Status Row (Exact Capture 1 Bottom Layout) -->
+      <div class="hidden md:block space-y-3 pt-4">
+        <div class="p-4 rounded-2xl bg-[#0f172a] border border-cyan-500/20 space-y-3">
+          <div class="w-8 h-8 rounded-lg bg-white text-slate-950 flex items-center justify-center font-black text-sm shadow">
+            ✦
+          </div>
+          <div class="space-y-1">
+            <div class="text-sm font-extrabold text-white">Mano AI Studio</div>
+            <p class="text-[11px] text-slate-400 leading-relaxed">
+              Auto viral clips, B-rolls & English captions ready in 1 click.
+            </p>
+          </div>
+          <!-- Two Rounded Pill Buttons matching Capture 1 -->
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <button onclick="openQuickGuideModal()" class="py-2 px-2 rounded-full bg-white hover:bg-slate-100 text-slate-950 font-bold text-[11px] flex items-center justify-center gap-1 transition cursor-pointer">
+              <span>📖</span>
+              <span>Guide</span>
+            </button>
+            <button onclick="showToast('Mano Clip Tool Web Portal Connected')" class="py-2 px-2 rounded-full bg-[#162038] hover:bg-[#1e2b4a] border border-cyan-400/25 text-cyan-300 font-bold text-[11px] flex items-center justify-center gap-1 transition cursor-pointer">
+              <span>🌐</span>
+              <span>Portal</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Bottom Status Row -->
+        <button onclick="openSettingsModal()" class="w-full px-2 py-1.5 flex items-center justify-between text-xs text-slate-400 hover:text-emerald-300 transition cursor-pointer">
+          <span class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Auto Engine: Active (Free)</span>
+          </span>
+          <span>⚙</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Dashboard Content Area -->
+    <main class="flex-1 p-5 sm:p-7 space-y-6 overflow-y-auto">
+      
+      <!-- Top Header Row (Projects + Count Badge | Search Projects | + New Project) -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-2.5">
+          <h1 class="text-lg font-extrabold text-white">Projects</h1>
+          <span id="projectCountBadge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">1</span>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div class="relative flex-1 sm:w-64">
+            <svg class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="8" />
+              <path stroke-linecap="round" d="M21 21l-4.35-4.35" />
+            </svg>
+            <input id="dashboardSearchInput" type="text" oninput="renderProjectsGrid()" placeholder="Search projects..." class="w-full pl-9 pr-4 py-2 rounded-full sapphire-input text-xs text-white placeholder-slate-500" />
+          </div>
+
+          <button onclick="openNewProjectModal()" class="px-4 py-2 rounded-full bg-white hover:bg-slate-100 text-slate-950 font-extrabold text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer shadow">
+            <span>+</span>
+            <span>New Project</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Projects Grid (Matching Capture 1 Card Layout: 9:16 Badge, Live Caption Preview, Duration, Code '001' below) -->
+      <div id="projectsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <!-- Populated dynamically -->
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- VIEW 2: EXACT 3-COLUMN STUDIO EDITOR (Matching Capture 2)             -->
+  <!-- ===================================================================== -->
+  <div id="studioView" class="hidden flex-1 flex flex-col min-h-screen">
+    
+    <!-- Top Bar: < Back | Step Progress Bar | Change Button -->
+    <header class="bg-[#0b1120] border-b border-cyan-500/15 px-4 sm:px-6 h-14 flex items-center justify-between gap-3 sticky top-0 z-30">
+      <button onclick="backToProjects()" class="px-3 py-1.5 rounded-lg hover:bg-white/5 text-xs font-bold text-slate-300 hover:text-white flex items-center gap-1.5 transition cursor-pointer">
+        <span>‹</span>
+        <span>Back</span>
+      </button>
+
+      <!-- Centered 4-Step Progress Bar (Select Video -> Viral Clips -> Edit -> Render) -->
+      <div class="hidden md:flex items-center gap-2 text-xs font-semibold">
+        <div class="flex items-center gap-1.5 text-emerald-400">
+          <span class="w-4 h-4 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-[10px] font-black">✓</span>
+          <span>Select Video</span>
+        </div>
+        <span class="w-6 h-[1px] bg-slate-700"></span>
+        <div id="stepViralPill" class="flex items-center gap-1.5 text-white font-bold">
+          <span class="w-4 h-4 rounded-full border-2 border-cyan-400 flex items-center justify-center">
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+          </span>
+          <span>Viral Clips</span>
+        </div>
+        <span class="w-6 h-[1px] bg-slate-700"></span>
+        <div id="stepEditPill" class="flex items-center gap-1.5 text-slate-500">
+          <span class="w-4 h-4 rounded-full border border-slate-600"></span>
+          <span>Edit</span>
+        </div>
+        <span class="w-6 h-[1px] bg-slate-700"></span>
+        <div id="stepRenderPill" class="flex items-center gap-1.5 text-slate-500">
+          <span class="w-4 h-4 rounded-full border border-slate-600"></span>
+          <span>Render</span>
+        </div>
+      </div>
+
+      <!-- Right "Change" Video Button -->
+      <button onclick="document.getElementById('videoUploadInput').click()" class="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 transition cursor-pointer shadow">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        </svg>
+        <span>Change</span>
+      </button>
+    </header>
+
+    <!-- Main 3-Column Workspace (Left Controls | Center Player & Timeline | Right Framing & Shorts) -->
+    <div class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3.5 p-3.5 max-w-[1650px] w-full mx-auto">
+      
+      <!-- LEFT COLUMN: Viral Clips Controls (Matching Capture 2) -->
+      <section class="lg:col-span-3 sapphire-card rounded-2xl p-4 flex flex-col justify-between space-y-4">
+        <div class="space-y-4">
+          <!-- Header + Badge -->
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-extrabold text-white">Viral Clips</h2>
+            <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-[10px] font-bold text-emerald-300">
+              AI Auto Engine
+            </span>
+          </div>
+
+          <!-- Form Rows matching Capture 2 clean label + input style -->
+          <div class="space-y-3">
+            <!-- Captions Dropdown (All English Styles) -->
+            <div class="flex items-center justify-between gap-2">
+              <label class="text-xs font-medium text-slate-300 shrink-0">Captions</label>
+              <select id="captionStyleSelect" onchange="changeCaptionStyle(this.value)" class="w-44 px-3 py-2 rounded-xl sapphire-input text-xs font-semibold text-white cursor-pointer">
+                <option value="hormozi">Hormozi Bold (Viral)</option>
+                <option value="karaoke">Karaoke Word Highlight</option>
+                <option value="cinematic">Cinematic Story</option>
+                <option value="neon">Neon Pop & Bounce</option>
+                <option value="clean">Clean Subtitle Bar</option>
+              </select>
+            </div>
+
+            <!-- Auto B-Rolls Dropdown -->
+            <div class="flex items-center justify-between gap-2">
+              <label class="text-xs font-medium text-slate-300 shrink-0">Auto B-Rolls</label>
+              <select id="brollModeSelect" onchange="changeBrollMode(this.value)" class="w-44 px-3 py-2 rounded-xl sapphire-input text-xs font-semibold text-cyan-300 cursor-pointer">
+                <option value="on">ON - Smart Cutaways</option>
+                <option value="subtle">Subtle Overlay</option>
+                <option value="off">Off</option>
+              </select>
+            </div>
+
+            <!-- Clip Length Input with Stepper Buttons -->
+            <div class="flex items-center justify-between gap-2">
+              <label class="text-xs font-medium text-slate-300 shrink-0">Clip length</label>
+              <div class="w-44 flex items-center justify-between px-3 py-1.5 rounded-xl sapphire-input">
+                <span id="clipLengthValue" class="text-xs font-bold text-white">30</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-[11px] text-slate-400">sec</span>
+                  <div class="flex flex-col leading-none">
+                    <button type="button" onclick="adjustClipLength(15)" class="text-[9px] text-slate-300 hover:text-cyan-400 cursor-pointer">▲</button>
+                    <button type="button" onclick="adjustClipLength(-15)" class="text-[9px] text-slate-300 hover:text-cyan-400 cursor-pointer">▼</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Clips Mode -->
+            <div class="flex items-center justify-between gap-2">
+              <label class="text-xs font-medium text-slate-300 shrink-0">Clips</label>
+              <select id="clipsModeSelect" class="w-44 px-3 py-2 rounded-xl sapphire-input text-xs font-semibold text-slate-200 cursor-pointer">
+                <option value="auto">Auto (Top Viral)</option>
+                <option value="3">Top 3 Viral Shorts</option>
+                <option value="5">Top 5 Viral Shorts</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Explanatory Helper Text (Matching Capture 2 Paragraph Style) -->
+          <p class="text-[11px] text-slate-400 leading-relaxed pt-1">
+            AI automatically scans speech energy, hooks, and emotional peaks to extract viral 9:16 shorts. Smart B-Rolls and English captions are synced automatically—just click <strong class="text-slate-200">Start clipping</strong>.
+          </p>
+        </div>
+
+        <!-- Bottom Navigation Row: < Back | Start clipping > -->
+        <div class="pt-3 border-t border-white/10 flex items-center justify-between gap-2">
+          <button onclick="backToProjects()" class="px-3 py-2.5 rounded-xl hover:bg-white/5 text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer">
+            ‹ Back
+          </button>
+          <button id="startClippingBtn" onclick="startViralClippingEngine()" class="flex-1 py-2.5 px-4 rounded-xl emerald-cyan-btn text-slate-950 font-black text-xs tracking-wide transition transform active:scale-95 flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/25 cursor-pointer">
+            <span>Start clipping</span>
+            <span>›</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- CENTER COLUMN: 9:16 Player + Full Working Audio Bar + Timeline -->
+      <section class="lg:col-span-5 flex flex-col gap-3.5">
+        
+        <!-- Player Card -->
+        <div class="sapphire-card rounded-2xl p-4 flex-1 flex flex-col items-center justify-between relative">
+          
+          <!-- Player Header -->
+          <div class="w-full flex items-center justify-between mb-2">
+            <span class="text-xs font-extrabold text-white">Player</span>
+            <div class="flex items-center gap-2">
+              <!-- Live Audio Status Pill -->
+              <span id="audioStatusPill" class="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-400/35 text-[10px] font-bold text-emerald-300">
+                🔊 Sound ON (100%)
+              </span>
+              <span class="px-2.5 py-0.5 rounded-full bg-[#080d1a] border border-white/10 text-[10px] font-semibold text-slate-300">
+                Face tracking at render
+              </span>
+            </div>
+          </div>
+
+          <!-- 9:16 Vertical Video Frame -->
+          <div class="relative w-full max-w-[270px] aspect-[9/16] rounded-2xl overflow-hidden bg-black border border-cyan-400/30 shadow-2xl flex items-center justify-center group">
+            
+            <!-- Real HTML5 Video Element (Full Unmuted Audio) -->
+            <video id="realVideoElement" class="w-full h-full object-cover hidden" playsinline></video>
+
+            <!-- Built-In Studio Demo Canvas (For Sample Project 001) -->
+            <canvas id="sampleStudioCanvas" class="w-full h-full block"></canvas>
+
+            <!-- Smart Auto B-Roll Cutaway Overlay -->
+            <div id="autoBrollBox" class="hidden absolute top-3.5 left-3.5 right-3.5 rounded-xl overflow-hidden border-2 border-emerald-400 shadow-2xl bg-[#070b14] z-10">
+              <div class="px-2.5 py-1 emerald-cyan-btn text-slate-950 text-[9px] font-black uppercase tracking-wider flex items-center justify-between">
+                <span>🎬 AUTO B-ROLL</span>
+                <span>Context Match</span>
+              </div>
+              <canvas id="brollVisualCanvas" class="w-full h-24 block"></canvas>
+            </div>
+
+            <!-- Live Synced English Captions -->
+            <div id="playerCaptionsBox" class="absolute bottom-9 left-3 right-3 text-center pointer-events-none select-none z-10">
+              <!-- Rendered live -->
+            </div>
+
+            <!-- Tap to Play/Pause & Unlock Audio Overlay -->
+            <button onclick="togglePlayerAudioAndPlayback()" class="absolute inset-0 w-full h-full flex items-center justify-center bg-black/15 opacity-0 group-hover:opacity-100 transition cursor-pointer z-20">
+              <div class="w-12 h-12 rounded-full bg-black/70 border border-white/25 flex items-center justify-center text-white text-sm font-bold">
+                <span id="overlayPlaySymbol">▶</span>
+              </div>
+            </button>
+
+            <!-- AI Clipping Progress Overlay -->
+            <div id="clippingLoaderOverlay" class="hidden absolute inset-0 bg-[#070b14]/92 backdrop-blur-md z-30 flex flex-col items-center justify-center p-5 text-center space-y-3">
+              <div class="w-12 h-12 rounded-2xl emerald-cyan-btn text-slate-950 flex items-center justify-center text-xl font-black animate-bounce">
+                ⚡
+              </div>
+              <div class="space-y-1">
+                <div id="loaderHeadline" class="text-xs font-extrabold text-white">Detecting Viral Hooks...</div>
+                <div id="loaderSubtext" class="text-[10px] text-emerald-300">Syncing Auto B-Rolls & English Captions</div>
+              </div>
+              <div class="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                <div id="loaderProgressFill" class="h-full emerald-cyan-btn transition-all duration-300" style="width: 20%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Player Transport + Loudness/Volume Controls -->
+          <div class="w-full mt-3 space-y-2">
+            <div class="flex items-center gap-2.5">
+              <!-- Play / Pause Button -->
+              <button id="mainPlayPauseBtn" onclick="togglePlayerAudioAndPlayback()" class="w-8 h-8 rounded-lg emerald-cyan-btn text-slate-950 flex items-center justify-center font-black text-xs cursor-pointer shrink-0 shadow">
+                ▶
+              </button>
+
+              <!-- Scrubber -->
+              <input id="playerSeekSlider" type="range" min="0" max="100" value="0" oninput="scrubPlayer(this.value)" class="flex-1 accent-emerald-400 h-1.5 bg-white/10 rounded-lg cursor-pointer" />
+
+              <!-- Time Counter -->
+              <span id="timeReadout" class="text-[11px] font-mono text-slate-300 shrink-0">0:00 / 0:30</span>
+            </div>
+
+            <!-- Dedicated Audio Loudness Row (Guarantees clear volume control) -->
+            <div class="flex items-center justify-between px-3 py-1.5 rounded-xl bg-[#080d1a] border border-white/5">
+              <button id="muteToggleBtn" onclick="toggleMuteAudio()" class="flex items-center gap-1.5 text-[11px] font-bold text-emerald-400 hover:text-emerald-300 cursor-pointer">
+                <span id="speakerEmoji">🔊</span>
+                <span id="muteLabelText">Audio Active</span>
+              </button>
+
+              <div class="flex items-center gap-2 w-36">
+                <span class="text-[10px] text-slate-400">Vol</span>
+                <input id="volumeRangeSlider" type="range" min="0" max="100" value="100" oninput="setPlayerVolume(this.value)" class="flex-1 accent-cyan-400 h-1 bg-white/15 rounded-lg cursor-pointer" />
+                <span id="volumePercentText" class="text-[10px] font-mono text-white w-8 text-right">100%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Timeline Panel (Matching Capture 2 Ruler & Track) -->
+        <div class="sapphire-card rounded-2xl p-3.5 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-extrabold text-white">Timeline</span>
+            <div class="flex items-center gap-2 text-slate-400 text-xs">
+              <span>🔍</span>
+              <input type="range" min="1" max="5" value="2" class="w-20 accent-cyan-400 h-1 bg-white/10 rounded-lg cursor-pointer" />
+              <span class="text-[10px] text-cyan-300 font-semibold" id="timelineStatusLabel">Ready</span>
+            </div>
+          </div>
+
+          <!-- Ruler Timestamps matching Capture 2 -->
+          <div class="flex justify-between text-[9px] font-mono text-slate-500 px-1">
+            <span>00:00.0</span>
+            <span>10:00.0</span>
+            <span>20:00.0</span>
+            <span>30:00.0</span>
+            <span>40:00.0</span>
+          </div>
+
+          <!-- Interactive Track -->
+          <div id="timelineTrackBox" class="h-11 rounded-xl border border-dashed border-white/15 bg-[#080d1a] p-1.5 flex items-center justify-center gap-1.5">
+            <button onclick="startViralClippingEngine()" class="text-[11px] text-slate-400 hover:text-emerald-300 font-medium cursor-pointer">
+              + Click "Start clipping" to extract viral segments
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN: Clip & Framing + Extracted Viral Shorts List -->
+      <section class="lg:col-span-4 sapphire-card rounded-2xl p-4 flex flex-col justify-between space-y-4">
+        <div class="space-y-4 overflow-y-auto max-h-[660px] pr-1">
+          <h2 class="text-sm font-extrabold text-white">Clip & Framing</h2>
+
+          <!-- Exact 3 Framing Rows from Capture 2 -->
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <label class="text-xs font-medium text-slate-300">Aspect ratio</label>
+              <select id="aspectRatioSelect" onchange="showToast('Aspect Ratio: ' + this.value)" class="w-44 px-3 py-2 rounded-xl sapphire-input text-xs font-bold text-white cursor-pointer">
+                <option value="9:16">9:16 (Shorts / Reels)</option>
+                <option value="1:1">1:1 (Square)</option>
+                <option value="16:9">16:9 (YouTube)</option>
+              </select>
+            </div>
+
+            <div class="flex items-center justify-between gap-2">
+              <label class="text-xs font-medium text-slate-300">Subject</label>
+              <select id="subjectTrackSelect" onchange="showToast('Subject Mode: ' + this.value)" class="w-44 px-3 py-2 rounded-xl sapphire-input text-xs font-bold text-emerald-300 cursor-pointer">
+                <option value="Face Tracking">Face Tracking</option>
+                <option value="Center Crop">Center Crop</option>
+                <option value="Action Focus">Action Focus</option>
+              </select>
+            </div>
+
+            <div class="flex items-center justify-between gap-2">
+              <label class="text-xs font-medium text-slate-300">Quality</label>
+              <select id="qualitySelect" onchange="showToast('Render Quality: ' + this.value)" class="w-44 px-3 py-2 rounded-xl sapphire-input text-xs font-bold text-white cursor-pointer">
+                <option value="1080p">1080p (Full HD)</option>
+                <option value="4K">4K Ultra HD</option>
+                <option value="720p">720p Fast</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Extracted Viral Shorts Section -->
+          <div class="pt-3 border-t border-white/10 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-extrabold text-white">Viral Shorts Ready</span>
+              <span id="shortsBadgeCount" class="px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 text-[10px] font-bold">3 Clips</span>
+            </div>
+
+            <div id="viralShortsContainer" class="space-y-2.5">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Download All Button -->
+        <button onclick="downloadAllViralShorts()" class="w-full py-3 px-4 rounded-xl bg-white hover:bg-slate-100 text-slate-950 font-extrabold text-xs transition flex items-center justify-center gap-2 shadow-lg cursor-pointer">
+          <span>⬇</span>
+          <span>Download All Shorts (1080p)</span>
+        </button>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL: NEW PROJECT (Upload Video or Paste Link)                       -->
+  <!-- ===================================================================== -->
+  <div id="newProjectModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="sapphire-card rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-extrabold text-white">New Viral Project</h3>
+        <button onclick="closeNewProjectModal()" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer">✕</button>
+      </div>
+
+      <div onclick="document.getElementById('videoUploadInput').click()" class="border-2 border-dashed border-cyan-500/40 hover:border-emerald-400 rounded-2xl p-6 text-center space-y-2 bg-[#080d1a] transition cursor-pointer">
+        <div class="w-12 h-12 rounded-2xl emerald-cyan-btn text-slate-950 mx-auto flex items-center justify-center text-xl font-black shadow-lg">
+          ↑
+        </div>
+        <div class="text-sm font-extrabold text-white">Choose Video File (MP4 / MOV)</div>
+        <p class="text-xs text-slate-400">Auto-extracts viral 9:16 shorts with B-Rolls & sound</p>
+      </div>
+
+      <div class="space-y-2">
+        <label class="text-xs font-bold text-slate-300">Or Paste Video URL</label>
+        <div class="flex gap-2">
+          <input id="pasteUrlInput" type="text" placeholder="https://youtube.com/watch?v=..." class="flex-1 px-3.5 py-2.5 rounded-xl sapphire-input text-xs text-white placeholder-slate-500" />
+          <button onclick="createFromPasteUrl()" class="px-4 py-2.5 rounded-xl emerald-cyan-btn text-slate-950 font-extrabold text-xs cursor-pointer">Create</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL: SETTINGS                                                       -->
+  <!-- ===================================================================== -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="sapphire-card rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-extrabold text-white">Mano Clip Tool Settings</h3>
+        <button onclick="closeSettingsModal()" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer">✕</button>
+      </div>
+      <div class="space-y-2.5 text-xs">
+        <div class="p-3 rounded-xl bg-[#080d1a] flex justify-between items-center">
+          <span class="text-slate-300">Caption Language</span>
+          <span class="font-bold text-emerald-400">English (All Styles)</span>
+        </div>
+        <div class="p-3 rounded-xl bg-[#080d1a] flex justify-between items-center">
+          <span class="text-slate-300">Auto B-Roll Engine</span>
+          <span class="font-bold text-cyan-400">Enabled (Smart Match)</span>
+        </div>
+        <div class="p-3 rounded-xl bg-[#080d1a] flex justify-between items-center">
+          <span class="text-slate-300">Audio Output</span>
+          <span class="font-bold text-emerald-400">100% Stereo Boost</span>
+        </div>
+      </div>
+      <button onclick="closeSettingsModal()" class="w-full py-2.5 rounded-xl emerald-cyan-btn text-slate-950 font-extrabold text-xs cursor-pointer">Done</button>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL: QUICK GUIDE                                                    -->
+  <!-- ===================================================================== -->
+  <div id="quickGuideModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="sapphire-card rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-extrabold text-white">3-Step Easy Guide</h3>
+        <button onclick="closeQuickGuideModal()" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer">✕</button>
+      </div>
+      <ol class="space-y-2.5 text-xs text-slate-300 list-decimal list-inside">
+        <li>Click <strong>+ New Project</strong> (or open project <strong>001</strong>).</li>
+        <li>Click <strong>Start clipping ›</strong> to auto-detect viral moments, B-Rolls & English captions.</li>
+        <li>Press <strong>Play (▶)</strong> to hear full audio and click <strong>Download Short</strong>.</li>
+      </ol>
+      <button onclick="closeQuickGuideModal()" class="w-full py-2.5 rounded-xl emerald-cyan-btn text-slate-950 font-extrabold text-xs cursor-pointer">Got It!</button>
+    </div>
+  </div>
+
+  <!-- Hidden Offscreen Canvas for Exporting 1080p Short Frame -->
+  <canvas id="shortExportCanvas" width="540" height="960" class="hidden"></canvas>
+
+  <script>
+    // =========================================================================
+    // 1. GUARANTEED AUDIBLE SOUND ENGINE (Web Audio API + English Voice Synth)
+    // =========================================================================
+    const audioEngine = {
+      ctx: null,
+      masterGain: null,
+      isMuted: false,
+      volume: 1.0,
+      lastSpokenLineKey: '',
+      chimeTimer: null,
+
+      // Must be called directly inside user click events to unlock browser audio!
+      unlock() {
+        try {
+          if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            this.ctx = new AudioCtx();
+            this.masterGain = this.ctx.createGain();
+            this.masterGain.gain.value = this.isMuted ? 0 : this.volume;
+
+            const compressor = this.ctx.createDynamicsCompressor();
+            compressor.threshold.value = -12;
+            compressor.ratio.value = 4;
+
+            this.masterGain.connect(compressor);
+            compressor.connect(this.ctx.destination);
+          }
+          if (this.ctx.state === 'suspended') {
+            this.ctx.resume();
+          }
+        } catch (e) {
+          console.warn('Web Audio unlock notice:', e);
+        }
+      },
+
+      setVolume(val0to1) {
+        this.volume = Math.max(0, Math.min(1, val0to1));
+        if (this.masterGain && this.ctx) {
+          this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : this.volume, this.ctx.currentTime);
+        }
+        const videoEl = document.getElementById('realVideoElement');
+        if (videoEl) {
+          videoEl.volume = this.volume;
+          videoEl.muted = this.isMuted;
+        }
+        if (this.isMuted || this.volume === 0) {
+          if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        }
+      },
+
+      setMuted(muteFlag) {
+        this.isMuted = muteFlag;
+        this.setVolume(this.volume);
+      },
+
+      // Plays a crisp, audible mid-frequency studio pulse/chime so speakers always output sound
+      playStudioPulse(freq = 520, duration = 0.14) {
+        if (this.isMuted || this.volume <= 0) return;
+        this.unlock();
+        if (!this.ctx || !this.masterGain) return;
+
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const env = this.ctx.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.18, now + duration);
+
+        env.gain.setValueAtTime(0.001, now);
+        env.gain.linearRampToValueAtTime(0.45 * this.volume, now + 0.02);
+        env.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+        osc.connect(env);
+        env.connect(this.masterGain);
+
+        osc.start(now);
+        osc.stop(now + duration + 0.02);
+      },
+
+      // Speaks the active English caption aloud for the sample project so user hears real voice!
+      speakCaptionLine(lineText, lineKey) {
+        if (this.isMuted || this.volume <= 0) return;
+        if (this.lastSpokenLineKey === lineKey) return;
+        this.lastSpokenLineKey = lineKey;
+
+        // Audible studio beat on every caption transition
+        this.playStudioPulse(587.33, 0.15);
+
+        if ('speechSynthesis' in window) {
+          try {
+            window.speechSynthesis.cancel();
+            const utter = new SpeechSynthesisUtterance(lineText.toLowerCase());
+            utter.lang = 'en-US';
+            utter.rate = 1.08;
+            utter.pitch = 1.02;
+            utter.volume = this.volume;
+            window.speechSynthesis.speak(utter);
+          } catch (err) {
+            // Fallback already handled by playStudioPulse
+          }
+        }
+      },
+
+      stopAll() {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+        }
+        this.lastSpokenLineKey = '';
+      }
+    };
+
+    // =========================================================================
+    // 2. STATE & PROJECTS DATA (Matching Reference Capture 1 & 2)
+    // =========================================================================
+    const state = {
+      activeProjectId: 'proj-001',
+      selectedClipIdx: 0,
+      captionStyle: 'hormozi',
+      brollMode: 'on',
+      clipLengthSec: 30,
+      isPlaying: false,
+      sampleClock: 0,
+      projects: [
+        {
+          id: 'proj-001',
+          code: '001',
+          title: '001',
+          subtitle: 'Podcast Viral Highlight',
+          duration: '43:48',
+          aspect: '9:16',
+          isRealVideo: false,
+          videoUrl: null,
+          clips: [
+            {
+              id: 'clip-1',
+              score: 98,
+              duration: '0:30',
+              startSec: 0,
+              hook: 'We Are Going To Change Everything Today!',
+              brollLabel: 'Studio Camera & Audience Reaction',
+              lines: [
+                { words: ['WE', 'ARE', 'GOING', 'TO', 'BE', 'UNSTOPPABLE'], hi: 5 },
+                { words: ['NOBODY', 'EXPECTED', 'THIS', 'VIRAL', 'MOMENT'], hi: 3 },
+                { words: ['ONE', 'DECISION', 'CHANGED', 'THE', 'ENTIRE', 'GAME'], hi: 2 },
+                { words: ['WATCH', 'WHAT', 'HAPPENS', 'NEXT'], hi: 3 }
+              ]
+            },
+            {
+              id: 'clip-2',
+              score: 95,
+              duration: '0:30',
+              startSec: 35,
+              hook: 'How He Built It From Zero Budget',
+              brollLabel: 'Late Night Workspace & City Lights',
+              lines: [
+                { words: ['ZERO', 'BUDGET', 'AND', 'NO', 'SHORTCUTS'], hi: 0 },
+                { words: ['THEY', 'LAUGHED', 'AT', 'THE', 'FIRST', 'STEP'], hi: 1 },
+                { words: ['NOW', 'EVERYONE', 'IS', 'WATCHING'], hi: 1 }
+              ]
+            },
+            {
+              id: 'clip-3',
+              score: 92,
+              duration: '0:30',
+              startSec: 75,
+              hook: 'The Secret 99% Of Creators Miss',
+              brollLabel: 'Close-Up Spotlight Cutaway',
+              lines: [
+                { words: ['99%', 'OF', 'PEOPLE', 'MISS', 'THIS', 'DETAIL'], hi: 0 },
+                { words: ['SAVE', 'THIS', 'CLIP', 'RIGHT', 'NOW'], hi: 0 }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+
+    // =========================================================================
+    // 3. UI HELPERS & MODALS
+    // =========================================================================
+    function showToast(message) {
+      const box = document.getElementById('toastBox');
+      document.getElementById('toastText').textContent = message;
+      box.classList.remove('translate-y-24', 'opacity-0');
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => {
+        box.classList.add('translate-y-24', 'opacity-0');
+      }, 2800);
+    }
+
+    function openNewProjectModal() {
+      audioEngine.unlock();
+      document.getElementById('newProjectModal').classList.remove('hidden');
+    }
+    function closeNewProjectModal() {
+      document.getElementById('newProjectModal').classList.add('hidden');
+    }
+    function triggerOpenFolder() {
+      audioEngine.unlock();
+      document.getElementById('videoUploadInput').click();
+    }
+    function openSettingsModal() {
+      document.getElementById('settingsModal').classList.remove('hidden');
+    }
+    function closeSettingsModal() {
+      document.getElementById('settingsModal').classList.add('hidden');
+    }
+    function openQuickGuideModal() {
+      document.getElementById('quickGuideModal').classList.remove('hidden');
+    }
+    function closeQuickGuideModal() {
+      document.getElementById('quickGuideModal').classList.add('hidden');
+    }
+
+    function setSidebarActive(tab) {
+      renderProjectsGrid();
+    }
+
+    // =========================================================================
+    // 4. DASHBOARD GRID RENDERING (Exact Capture 1 Card Aesthetics)
+    // =========================================================================
+    function renderProjectsGrid() {
+      const grid = document.getElementById('projectsGrid');
+      const query = (document.getElementById('dashboardSearchInput').value || '').toLowerCase();
+      const filtered = state.projects.filter(p =>
+        p.code.toLowerCase().includes(query) || p.subtitle.toLowerCase().includes(query)
+      );
+
+      document.getElementById('projectCountBadge').textContent = filtered.length;
+      grid.innerHTML = '';
+
+      filtered.forEach(proj => {
+        const card = document.createElement('div');
+        card.onclick = () => openStudioForProject(proj.id);
+        card.className = 'group cursor-pointer space-y-2.5';
+
+        card.innerHTML = `
+          <!-- Thumbnail Container matching Capture 1 -->
+          <div class="relative aspect-[16/10] rounded-2xl overflow-hidden bg-gradient-to-br from-[#132238] via-[#0f172a] to-[#064e3b] border border-cyan-500/20 group-hover:border-emerald-400/70 transition shadow-xl flex items-center justify-center">
+            <!-- Top-Left 9:16 Badge -->
+            <span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-black/75 text-[10px] font-extrabold text-white border border-white/10">
+              ${proj.aspect}
+            </span>
+
+            <!-- Center Visual Studio Preview -->
+            <div class="w-20 h-28 rounded-xl bg-gradient-to-b from-cyan-500/25 to-emerald-500/20 border border-white/15 flex flex-col items-center justify-between p-2 group-hover:scale-105 transition">
+              <div class="w-7 h-7 rounded-full bg-white/15 mt-2"></div>
+              <span class="text-[7px] font-black tracking-tight text-white bg-black/75 px-1.5 py-0.5 rounded uppercase text-center leading-tight">
+                WE ARE GOING TO BE
+              </span>
+            </div>
+
+            <!-- Bottom-Right Duration Pill -->
+            <span class="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 text-[10px] font-bold text-white">
+              ${proj.duration}
+            </span>
+          </div>
+
+          <!-- Centered Project Code Underneath (Exact Capture 1 '001' style) -->
+          <div class="text-center">
+            <div class="text-sm font-bold text-slate-200 group-hover:text-emerald-300 transition">${proj.code}</div>
+            <div class="text-[11px] text-slate-500">${proj.subtitle}</div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    // =========================================================================
+    // 5. UPLOAD REAL VIDEO & CREATE PROJECT
+    // =========================================================================
+    function handleRealVideoUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      closeNewProjectModal();
+      audioEngine.unlock();
+
+      const objectUrl = URL.createObjectURL(file);
+      const nextCode = String(state.projects.length + 1).padStart(3, '0');
+      const cleanTitle = file.name.replace(/\.[^/.]+$/, '');
+
+      const newProj = {
+        id: 'proj-' + Date.now(),
+        code: nextCode,
+        title: nextCode,
+        subtitle: cleanTitle,
+        duration: 'Auto',
+        aspect: '9:16',
+        isRealVideo: true,
+        videoUrl: objectUrl,
+        clips: [
+          {
+            id: 'rc-1',
+            score: 98,
+            duration: '0:30',
+            startSec: 0,
+            hook: `Viral Hook #1 — ${cleanTitle.slice(0, 26)}`,
+            brollLabel: 'Auto Context B-Roll Overlay',
+            lines: [
+              { words: ['THIS', 'MOMENT', 'CHANGES', 'EVERYTHING'], hi: 1 },
+              { words: ['WATCH', 'CLOSELY', 'WHAT', 'HAPPENS', 'NEXT'], hi: 0 },
+              { words: ['MOST', 'PEOPLE', 'NEVER', 'SEE', 'THIS'], hi: 3 }
+            ]
+          },
+          {
+            id: 'rc-2',
+            score: 94,
+            duration: '0:30',
+            startSec: 15,
+            hook: 'High-Engagement Story Peak',
+            brollLabel: 'Smart Reaction B-Roll',
+            lines: [
+              { words: ['HERE', 'IS', 'THE', 'BIGGEST', 'SECRET'], hi: 3 },
+              { words: ['SHARE', 'THIS', 'WITH', 'YOUR', 'FRIENDS'], hi: 0 }
+            ]
+          },
+          {
+            id: 'rc-3',
+            score: 91,
+            duration: '0:30',
+            startSec: 30,
+            hook: 'Unstoppable Viral Ending',
+            brollLabel: 'Dynamic Spotlight B-Roll',
+            lines: [
+              { words: ['RESULTS', 'SPEAK', 'LOUDER', 'THAN', 'WORDS'], hi: 2 }
+            ]
+          }
+        ]
+      };
+
+      state.projects.unshift(newProj);
+      renderProjectsGrid();
+      openStudioForProject(newProj.id, true);
+    }
+
+    function createFromPasteUrl() {
+      const val = document.getElementById('pasteUrlInput').value.trim();
+      if (!val) {
+        showToast('Please paste a video link first');
+        return;
+      }
+      closeNewProjectModal();
+      audioEngine.unlock();
+      const nextCode = String(state.projects.length + 1).padStart(3, '0');
+      const copy = JSON.parse(JSON.stringify(state.projects[0]));
+      copy.id = 'proj-' + Date.now();
+      copy.code = nextCode;
+      copy.title = nextCode;
+      copy.subtitle = 'Linked Video Project';
+      state.projects.unshift(copy);
+      renderProjectsGrid();
+      openStudioForProject(copy.id, true);
+    }
+
+    // =========================================================================
+    // 6. STUDIO EDITOR & AUDIO PLAYBACK CONTROLS
+    // =========================================================================
+    function getActiveProject() {
+      return state.projects.find(p => p.id === state.activeProjectId) || state.projects[0];
+    }
+
+    function openStudioForProject(projectId, autoRunClipper = false) {
+      audioEngine.unlock();
+      state.activeProjectId = projectId;
+      state.selectedClipIdx = 0;
+
+      const proj = getActiveProject();
+      document.getElementById('dashboardView').classList.add('hidden');
+      document.getElementById('studioView').classList.remove('hidden');
+
+      const videoEl = document.getElementById('realVideoElement');
+      const sampleCanvas = document.getElementById('sampleStudioCanvas');
+
+      if (proj.isRealVideo && proj.videoUrl) {
+        videoEl.src = proj.videoUrl;
+        videoEl.muted = audioEngine.isMuted;
+        videoEl.volume = audioEngine.volume;
+        videoEl.classList.remove('hidden');
+        sampleCanvas.classList.add('hidden');
+
+        videoEl.onloadedmetadata = () => {
+          const total = Math.max(5, Math.floor(videoEl.duration));
+          proj.duration = formatTime(total);
+          proj.clips.forEach((c, idx) => {
+            c.startSec = Math.floor((total / proj.clips.length) * idx);
+          });
+        };
+
+        videoEl.play().then(() => {
+          state.isPlaying = true;
+          updatePlaybackIcons();
+        }).catch(() => {
+          state.isPlaying = false;
+          updatePlaybackIcons();
+        });
+      } else {
+        videoEl.pause();
+        videoEl.classList.add('hidden');
+        sampleCanvas.classList.remove('hidden');
+        state.sampleClock = 0;
+        state.isPlaying = true;
+        updatePlaybackIcons();
+        audioEngine.playStudioPulse(523.25, 0.16);
+      }
+
+      renderViralShortsPanel();
+      if (autoRunClipper) {
+        startViralClippingEngine();
+      }
+    }
+
+    function backToProjects() {
+      state.isPlaying = false;
+      audioEngine.stopAll();
+      const videoEl = document.getElementById('realVideoElement');
+      videoEl.pause();
+      document.getElementById('studioView').classList.add('hidden');
+      document.getElementById('dashboardView').classList.remove('hidden');
+      renderProjectsGrid();
+    }
+
+    function togglePlayerAudioAndPlayback() {
+      // Unlock AudioContext right on user click!
+      audioEngine.unlock();
+
+      const proj = getActiveProject();
+      const videoEl = document.getElementById('realVideoElement');
+      state.isPlaying = !state.isPlaying;
+
+      if (proj.isRealVideo) {
+        videoEl.muted = audioEngine.isMuted;
+        videoEl.volume = audioEngine.volume;
+        if (state.isPlaying) {
+          videoEl.play().catch(() => {});
+        } else {
+          videoEl.pause();
+        }
+      } else {
+        if (state.isPlaying) {
+          audioEngine.lastSpokenLineKey = ''; // Force immediate voice/chime playback
+          audioEngine.playStudioPulse(659.25, 0.15);
+        } else {
+          audioEngine.stopAll();
+        }
+      }
+
+      updatePlaybackIcons();
+    }
+
+    function updatePlaybackIcons() {
+      const symbol = state.isPlaying ? '❚❚' : '▶';
+      document.getElementById('mainPlayPauseBtn').textContent = symbol;
+      document.getElementById('overlayPlaySymbol').textContent = symbol;
+    }
+
+    function toggleMuteAudio() {
+      audioEngine.unlock();
+      audioEngine.setMuted(!audioEngine.isMuted);
+      updateAudioIndicators();
+      if (!audioEngine.isMuted) {
+        audioEngine.playStudioPulse(587.33, 0.14);
+        showToast('🔊 Audio Unmuted (100%)');
+      } else {
+        showToast('🔇 Audio Muted');
+      }
+    }
+
+    function setPlayerVolume(val) {
+      audioEngine.unlock();
+      const num = Number(val);
+      if (num > 0 && audioEngine.isMuted) {
+        audioEngine.isMuted = false;
+      }
+      audioEngine.setVolume(num / 100);
+      updateAudioIndicators();
+    }
+
+    function updateAudioIndicators() {
+      const pct = audioEngine.isMuted ? 0 : Math.round(audioEngine.volume * 100);
+      document.getElementById('volumeRangeSlider').value = pct;
+      document.getElementById('volumePercentText').textContent = `${pct}%`;
+
+      const pill = document.getElementById('audioStatusPill');
+      const emoji = document.getElementById('speakerEmoji');
+      const label = document.getElementById('muteLabelText');
+
+      if (pct === 0) {
+        pill.textContent = '🔇 Muted (0%)';
+        pill.className = 'px-2.5 py-0.5 rounded-full bg-rose-500/15 border border-rose-400/35 text-[10px] font-bold text-rose-300';
+        emoji.textContent = '🔇';
+        label.textContent = 'Muted';
+      } else {
+        pill.textContent = `🔊 Sound ON (${pct}%)`;
+        pill.className = 'px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-400/35 text-[10px] font-bold text-emerald-300';
+        emoji.textContent = '🔊';
+        label.textContent = 'Audio Active';
+      }
+    }
+
+    function scrubPlayer(sliderVal) {
+      const pct = Number(sliderVal) / 100;
+      const proj = getActiveProject();
+      if (proj.isRealVideo) {
+        const videoEl = document.getElementById('realVideoElement');
+        if (videoEl.duration) videoEl.currentTime = pct * videoEl.duration;
+      } else {
+        state.sampleClock = pct * state.clipLengthSec;
+      }
+    }
+
+    function formatTime(sec) {
+      const s = Math.max(0, Math.floor(sec));
+      const m = Math.floor(s / 60);
+      const r = s % 60;
+      return `${m}:${String(r).padStart(2, '0')}`;
+    }
+
+    // =========================================================================
+    // 7. LEFT & RIGHT PANEL CONTROLS
+    // =========================================================================
+    function changeCaptionStyle(style) {
+      state.captionStyle = style;
+      renderViralShortsPanel();
+      showToast(`English Captions: ${style.toUpperCase()}`);
+    }
+
+    function changeBrollMode(mode) {
+      state.brollMode = mode;
+      if (mode === 'off') {
+        document.getElementById('autoBrollBox').classList.add('hidden');
+      }
+      showToast(`Auto B-Rolls: ${mode.toUpperCase()}`);
+    }
+
+    function adjustClipLength(delta) {
+      state.clipLengthSec = Math.max(15, Math.min(90, state.clipLengthSec + delta));
+      document.getElementById('clipLengthValue').textContent = state.clipLengthSec;
+      showToast(`Clip Length: ${state.clipLengthSec} sec`);
+    }
+
+    function startViralClippingEngine() {
+      audioEngine.unlock();
+      audioEngine.playStudioPulse(523.25, 0.14);
+
+      const overlay = document.getElementById('clippingLoaderOverlay');
+      const fill = document.getElementById('loaderProgressFill');
+      const head = document.getElementById('loaderHeadline');
+      const sub = document.getElementById('loaderSubtext');
+
+      overlay.classList.remove('hidden');
+      fill.style.width = '22%';
+
+      const steps = [
+        { w: '48%', h: 'Tracing Viral Hooks...', s: 'Finding high-retention speech peaks' },
+        { w: '78%', h: 'Inserting Auto B-Rolls...', s: 'Matching context-aware cutaways' },
+        { w: '100%', h: 'Syncing English Captions...', s: '3 Viral Shorts ready in 1080p!' }
+      ];
+
+      let i = 0;
+      const interval = setInterval(() => {
+        if (i < steps.length) {
+          fill.style.width = steps[i].w;
+          head.textContent = steps[i].h;
+          sub.textContent = steps[i].s;
+          i++;
+        } else {
+          clearInterval(interval);
+          setTimeout(() => {
+            overlay.classList.add('hidden');
+            audioEngine.playStudioPulse(783.99, 0.2);
+
+            // Light up Edit & Render steps
+            document.getElementById('stepEditPill').className = 'flex items-center gap-1.5 text-emerald-400 font-bold';
+            document.getElementById('stepRenderPill').className = 'flex items-center gap-1.5 text-cyan-300 font-bold';
+
+            renderTimelineClips();
+            renderViralShortsPanel();
+            selectViralClip(0);
+            showToast('✨ 3 Viral Shorts Extracted with B-Rolls & Audio!');
+          }, 280);
+        }
+      }, 420);
+    }
+
+    function selectViralClip(idx) {
+      audioEngine.unlock();
+      state.selectedClipIdx = idx;
+      const proj = getActiveProject();
+      const clip = proj.clips[idx] || proj.clips[0];
+
+      document.getElementById('timelineStatusLabel').textContent = `Clip #${idx + 1} (${clip.score}% Viral)`;
+
+      if (proj.isRealVideo) {
+        const videoEl = document.getElementById('realVideoElement');
+        if (videoEl.readyState >= 1) {
+          videoEl.currentTime = Math.min(clip.startSec, Math.max(0, videoEl.duration - 2));
+        }
+        videoEl.play().catch(() => {});
+      } else {
+        state.sampleClock = 0;
+        audioEngine.lastSpokenLineKey = '';
+      }
+
+      state.isPlaying = true;
+      updatePlaybackIcons();
+      renderTimelineClips();
+      renderViralShortsPanel();
+    }
+
+    function renderTimelineClips() {
+      const track = document.getElementById('timelineTrackBox');
+      const proj = getActiveProject();
+      track.innerHTML = '';
+
+      proj.clips.forEach((clip, idx) => {
+        const active = idx === state.selectedClipIdx;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.onclick = () => selectViralClip(idx);
+        btn.className = active
+          ? 'flex-1 h-full rounded-lg emerald-cyan-btn text-slate-950 text-[11px] font-black px-2.5 flex items-center justify-between shadow cursor-pointer'
+          : 'flex-1 h-full rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-[11px] font-semibold px-2.5 flex items-center justify-between cursor-pointer';
+        btn.innerHTML = `<span>Short #${idx + 1}</span><span>${clip.score}%</span>`;
+        track.appendChild(btn);
+      });
+    }
+
+    function renderViralShortsPanel() {
+      const container = document.getElementById('viralShortsContainer');
+      const proj = getActiveProject();
+      document.getElementById('shortsBadgeCount').textContent = `${proj.clips.length} Clips`;
+      container.innerHTML = '';
+
+      proj.clips.forEach((clip, idx) => {
+        const selected = idx === state.selectedClipIdx;
+        const card = document.createElement('div');
+        card.className = selected
+          ? 'p-3 rounded-xl bg-[#13203b] border border-emerald-400/70 space-y-2.5 transition'
+          : 'p-3 rounded-xl bg-[#080d1a] border border-white/10 hover:border-cyan-400/40 space-y-2.5 transition';
+
+        card.innerHTML = `
+          <div onclick="selectViralClip(${idx})" class="cursor-pointer space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold">🔥 ${clip.score}% Viral</span>
+              <span class="text-[10px] font-mono text-slate-400">0:${state.clipLengthSec}</span>
+            </div>
+            <div class="text-xs font-bold text-white leading-snug">#${idx + 1}: ${clip.hook}</div>
+            <div class="text-[10px] text-cyan-300">🎬 Auto B-Roll • ${state.captionStyle.toUpperCase()}</div>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="selectViralClip(${idx})" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-[11px] font-bold text-white cursor-pointer">▶ Play</button>
+            <button onclick="downloadSingleShort(${idx})" class="flex-1 py-1.5 px-3 rounded-lg emerald-cyan-btn text-slate-950 font-extrabold text-[11px] cursor-pointer">⬇ Download Short</button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // =========================================================================
+    // 8. LIVE ANIMATION, CAPTIONS & VOICE SYNC LOOP
+    // =========================================================================
+    let prevTs = performance.now();
+    function mainStudioLoop(ts) {
+      const dt = (ts - prevTs) / 1000;
+      prevTs = ts;
+
+      const isStudioOpen = !document.getElementById('studioView').classList.contains('hidden');
+      if (isStudioOpen) {
+        const proj = getActiveProject();
+        const clip = proj.clips[state.selectedClipIdx] || proj.clips[0];
+        let curSec = 0;
+        let maxSec = state.clipLengthSec;
+
+        if (proj.isRealVideo) {
+          const videoEl = document.getElementById('realVideoElement');
+          curSec = videoEl.currentTime || 0;
+          maxSec = videoEl.duration || state.clipLengthSec;
+        } else {
+          if (state.isPlaying) {
+            state.sampleClock = (state.sampleClock + dt) % state.clipLengthSec;
+          }
+          curSec = state.sampleClock;
+          maxSec = state.clipLengthSec;
+          renderSampleCanvasFrame(curSec);
+        }
+
+        document.getElementById('playerSeekSlider').value = Math.min(100, (curSec / maxSec) * 100);
+        document.getElementById('timeReadout').textContent = `${formatTime(curSec)} / ${formatTime(maxSec)}`;
+
+        renderLiveCaptions(curSec, clip, !proj.isRealVideo);
+        renderAutoBrollOverlay(curSec, clip);
+      }
+
+      requestAnimationFrame(mainStudioLoop);
+    }
+
+    function renderSampleCanvasFrame(t) {
+      const canvas = document.getElementById('sampleStudioCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (canvas.width !== 360) {
+        canvas.width = 360;
+        canvas.height = 640;
+      }
+      const w = canvas.width;
+      const h = canvas.height;
+
+      const grad = ctx.createLinearGradient(0, 0, w, h);
+      grad.addColorStop(0, '#070b14');
+      grad.addColorStop(0.5, '#0f172a');
+      grad.addColorStop(1, '#064e3b');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+
+      // Animated studio glow
+      const wave = Math.sin(t * 2.5) * 20;
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.16)';
+      ctx.beginPath();
+      ctx.arc(w * 0.35 + wave, h * 0.35, 105, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(6, 182, 212, 0.16)';
+      ctx.beginPath();
+      ctx.arc(w * 0.65 - wave, h * 0.55, 115, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Speaker silhouette
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.09)';
+      ctx.beginPath();
+      ctx.arc(w / 2, h * 0.37, 50, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.roundRect(w / 2 - 82, h * 0.47, 164, 145, 36);
+      ctx.fill();
+
+      // Face tracking frame
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.65)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(w / 2 - 66, h * 0.27, 132, 132);
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#34d399';
+      ctx.font = 'bold 10px Inter, sans-serif';
+      ctx.fillText('FACE TRACKING • 9:16', w / 2 - 58, h * 0.26);
+
+      // Live Audio Equalizer Bars (Reacting to playback)
+      const bars = 20;
+      const startX = (w - bars * 9) / 2;
+      for (let i = 0; i < bars; i++) {
+        const barH = state.isPlaying ? (Math.abs(Math.sin(t * 9 + i * 0.7)) * 28 + 6) : 6;
+        ctx.fillStyle = i % 2 === 0 ? '#10b981' : '#22d3ee';
+        ctx.beginPath();
+        ctx.roundRect(startX + i * 9, h * 0.67 - barH / 2, 5, barH, 3);
+        ctx.fill();
+      }
+    }
+
+    function renderLiveCaptions(t, clip, speakAloud) {
+      const box = document.getElementById('playerCaptionsBox');
+      const lines = clip.lines;
+      const lineIdx = Math.floor(t / 2.6) % lines.length;
+      const lineObj = lines[lineIdx];
+      const wordIdx = Math.floor((t % 2.6) / (2.6 / lineObj.words.length));
+
+      // Trigger real spoken English voice + chime on sample project when playing!
+      if (speakAloud && state.isPlaying) {
+        audioEngine.speakCaptionLine(lineObj.words.join(' '), `${clip.id}-${lineIdx}`);
+      }
+
+      const renderKey = `${state.captionStyle}-${clip.id}-${lineIdx}-${wordIdx}`;
+      if (box.dataset.key === renderKey) return;
+      box.dataset.key = renderKey;
+
+      const htmlWords = lineObj.words.map((w, idx) => {
+        const active = idx === wordIdx;
+        const emphasized = idx === lineObj.hi;
+
+        if (state.captionStyle === 'hormozi') {
+          const cls = active ? 'text-amber-300 scale-110' : emphasized ? 'text-emerald-300' : 'text-white';
+          return `<span class="inline-block mx-1 font-display font-black italic uppercase text-base sm:text-lg drop-shadow-[0_3px_4px_rgba(0,0,0,0.95)] ${cls}">${w}</span>`;
+        }
+        if (state.captionStyle === 'karaoke') {
+          const cls = active ? 'bg-emerald-400 text-slate-950 px-1.5 py-0.5 rounded' : 'text-white';
+          return `<span class="inline-block mx-1 font-extrabold uppercase text-sm sm:text-base drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] ${cls}">${w}</span>`;
+        }
+        if (state.captionStyle === 'neon') {
+          const cls = active ? 'text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.95)] scale-110' : 'text-emerald-200';
+          return `<span class="inline-block mx-1 font-display font-black uppercase text-base ${cls}">${w}</span>`;
+        }
+        // Cinematic / Clean Subtitle Bar
+        const cls = active ? 'text-emerald-300 font-extrabold' : 'text-white font-semibold';
+        return `<span class="inline-block mx-1 text-xs sm:text-sm ${cls}">${w}</span>`;
+      }).join('');
+
+      const wrap = (state.captionStyle === 'cinematic' || state.captionStyle === 'clean')
+        ? 'inline-block px-3 py-1.5 rounded-xl bg-black/80 border border-white/10 caption-pop'
+        : 'caption-pop';
+
+      box.innerHTML = `<div class="${wrap}">${htmlWords}</div>`;
+    }
+
+    function renderAutoBrollOverlay(t, clip) {
+      const box = document.getElementById('autoBrollBox');
+      if (state.brollMode === 'off') {
+        box.classList.add('hidden');
+        return;
+      }
+
+      const cycle = t % 6;
+      if (cycle >= 2.2 && cycle <= 5.0) {
+        box.classList.remove('hidden');
+        const c = document.getElementById('brollVisualCanvas');
+        const ctx = c.getContext('2d');
+        c.width = 250;
+        c.height = 96;
+
+        const g = ctx.createLinearGradient(0, 0, 250, 96);
+        g.addColorStop(0, '#065f46');
+        g.addColorStop(1, '#0e7490');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, 250, 96);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px Inter, sans-serif';
+        ctx.fillText(clip.brollLabel, 10, 44);
+
+        ctx.fillStyle = '#a7f3d0';
+        ctx.font = '600 9px Inter, sans-serif';
+        ctx.fillText('Auto-Inserted Contextual B-Roll', 10, 64);
+      } else {
+        box.classList.add('hidden');
+      }
+    }
+
+    // =========================================================================
+    // 9. ONE-CLICK EXPORT / DOWNLOAD SHORT
+    // =========================================================================
+    function downloadSingleShort(idx) {
+      audioEngine.unlock();
+      audioEngine.playStudioPulse(659.25, 0.14);
+      const proj = getActiveProject();
+      const clip = proj.clips[idx] || proj.clips[0];
+      showToast(`Exporting Viral Short #${idx + 1} (1080p)...`);
+
+      const canvas = document.getElementById('shortExportCanvas');
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+
+      const grad = ctx.createLinearGradient(0, 0, w, h);
+      grad.addColorStop(0, '#070b14');
+      grad.addColorStop(0.5, '#0f172a');
+      grad.addColorStop(1, '#064e3b');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+
+      const videoEl = document.getElementById('realVideoElement');
+      if (proj.isRealVideo && videoEl.readyState >= 2) {
+        const vw = videoEl.videoWidth || 1280;
+        const vh = videoEl.videoHeight || 720;
+        const cropW = vh * (9 / 16);
+        const sx = Math.max(0, (vw - cropW) / 2);
+        ctx.drawImage(videoEl, sx, 0, cropW, vh, 0, 0, w, h);
+      }
+
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      ctx.roundRect(28, 36, 230, 36, 10);
+      ctx.fill();
+      ctx.fillStyle = '#022c22';
+      ctx.font = 'bold 15px Inter, sans-serif';
+      ctx.fillText(`🔥 ${clip.score}% VIRAL SHORT`, 42, 60);
+
+      ctx.fillStyle = '#facc15';
+      ctx.font = '900 30px Montserrat, sans-serif';
+      ctx.fillText(clip.lines[0].words.join(' '), 28, h - 140);
+
+      ctx.fillStyle = '#34d399';
+      ctx.font = 'bold 14px Inter, sans-serif';
+      ctx.fillText(`Mano Clip Tool • ${state.captionStyle.toUpperCase()} • 1080p`, 28, h - 52);
+
+      canvas.toBlob(blob => {
+        if (!blob) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `ManoClipTool_Short_${idx + 1}_1080p.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        showToast(`✅ Short #${idx + 1} Downloaded!`);
+      }, 'image/png');
+    }
+
+    function downloadAllViralShorts() {
+      const proj = getActiveProject();
+      proj.clips.forEach((_, i) => {
+        setTimeout(() => downloadSingleShort(i), i * 500);
+      });
+    }
+
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', () => {
+      renderProjectsGrid();
+      requestAnimationFrame(mainStudioLoop);
+    });
+  </script>
+</body>
+</html>
