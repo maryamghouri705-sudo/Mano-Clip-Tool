@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -1478,19 +1477,3 @@
         showToast(`✅ Short #${idx + 1} Downloaded!`);
       }, 'image/png');
     }
-
-    function downloadAllViralShorts() {
-      const proj = getActiveProject();
-      proj.clips.forEach((_, i) => {
-        setTimeout(() => downloadSingleShort(i), i * 500);
-      });
-    }
-
-    // Initialize on load
-    window.addEventListener('DOMContentLoaded', () => {
-      renderProjectsGrid();
-      requestAnimationFrame(mainStudioLoop);
-    });
-  </script>
-</body>
-</html>
