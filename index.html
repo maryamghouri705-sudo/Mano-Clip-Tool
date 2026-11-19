@@ -1214,6 +1214,9 @@
       });
     }
 
+    // Per-clip export state is kept separately so each card shows its own progress.
+    const shortDownloadState = {};
+
     function renderViralShortsPanel() {
       const container = document.getElementById('viralShortsContainer');
       const proj = getActiveProject();
@@ -1222,27 +1225,93 @@
 
       proj.clips.forEach((clip, idx) => {
         const selected = idx === state.selectedClipIdx;
+        const dl = shortDownloadState[idx] || { status: 'idle', percent: 0, elapsed: 0, duration: state.clipLengthSec };
         const card = document.createElement('div');
         card.className = selected
-          ? 'p-3 rounded-xl bg-[#13203b] border border-emerald-400/70 space-y-2.5 transition'
-          : 'p-3 rounded-xl bg-[#080d1a] border border-white/10 hover:border-cyan-400/40 space-y-2.5 transition';
+          ? 'p-3 rounded-xl bg-[#13203b] border border-emerald-400/70 space-y-2 transition'
+          : 'p-3 rounded-xl bg-[#080d1a] border border-white/10 hover:border-cyan-400/40 space-y-2 transition';
+
+        const statusText = dl.status === 'done' ? '✓ Downloaded'
+          : dl.status === 'working' ? (dl.phase || 'Preparing video…')
+          : dl.status === 'error' ? 'Download failed'
+          : 'Ready to download';
+        const statusColor = dl.status === 'done' ? 'text-emerald-300'
+          : dl.status === 'error' ? 'text-rose-300'
+          : dl.status === 'working' ? 'text-cyan-300' : 'text-slate-400';
+        const progressColor = dl.status === 'done' ? 'bg-emerald-400' : 'bg-sky-400';
 
         card.innerHTML = `
           <div onclick="selectViralClip(${idx})" class="cursor-pointer space-y-1">
             <div class="flex items-center justify-between">
               <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold">🔥 ${clip.score}% Viral</span>
-              <span class="text-[10px] font-mono text-slate-400">0:${state.clipLengthSec}</span>
+              <span class="text-[10px] font-mono text-slate-400">Short ${idx + 1} · 0:${state.clipLengthSec}</span>
             </div>
             <div class="text-xs font-bold text-white leading-snug">#${idx + 1}: ${clip.hook}</div>
             <div class="text-[10px] text-cyan-300">✦ ${state.captionStyle.toUpperCase()} Captions</div>
           </div>
-          <div class="flex gap-2">
+          <div class="flex items-center justify-between gap-2">
             <button onclick="selectViralClip(${idx})" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-[11px] font-bold text-white cursor-pointer">▶ Play</button>
-            <button onclick="downloadSingleShort(${idx})" class="flex-1 py-1.5 px-3 rounded-lg emerald-cyan-btn text-slate-950 font-extrabold text-[11px] cursor-pointer">⬇ Download Short</button>
+            <span id="shortStatus-${idx}" class="text-[10px] font-semibold ${statusColor}">${statusText}</span>
+            <span id="shortTime-${idx}" class="text-[10px] font-mono text-slate-400">${dl.status === 'working' ? formatTime(dl.elapsed) + ' / ' + formatTime(dl.duration) : dl.status === 'done' ? '100%' : ''}</span>
+          </div>
+          <div class="w-full h-1.5 rounded-full bg-slate-700/80 overflow-hidden" aria-label="Short ${idx + 1} download progress">
+            <div id="shortProgress-${idx}" class="h-full rounded-full ${progressColor} transition-all duration-200" style="width:${dl.percent}%"></div>
+          </div>
+          <div class="text-[9px] text-slate-500 flex justify-between">
+            <span id="shortPhase-${idx}">${statusText}</span>
+            <span id="shortPercent-${idx}">${dl.percent}%</span>
           </div>
         `;
         container.appendChild(card);
       });
+
+      // One grouped row for all three downloads, rather than a large button on every card.
+      let group = document.getElementById('shortDownloadButtons');
+      if (!group) {
+        group = document.createElement('div');
+        group.id = 'shortDownloadButtons';
+        group.className = 'grid grid-cols-3 gap-2 mt-2';
+        container.parentElement.appendChild(group);
+      }
+      group.innerHTML = proj.clips.map((clip, idx) => {
+        const dl = shortDownloadState[idx] || { status: 'idle' };
+        const done = dl.status === 'done';
+        const busy = dl.status === 'working';
+        return `<button type="button" onclick="downloadSingleShort(${idx})" ${busy ? 'disabled' : ''}
+          class="min-w-0 py-2 px-1 rounded-lg ${done ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : busy ? 'bg-slate-700 text-slate-400' : 'emerald-cyan-btn text-slate-950'} text-[10px] font-extrabold cursor-pointer disabled:opacity-70">
+          ${done ? '✓ Short ' + (idx + 1) : busy ? '… Short ' + (idx + 1) : '⬇ Short ' + (idx + 1)}
+        </button>`;
+      }).join('');
+    }
+
+    function updateShortDownloadUI(idx, patch) {
+      shortDownloadState[idx] = { ...(shortDownloadState[idx] || {}), ...patch };
+      const dl = shortDownloadState[idx];
+      const bar = document.getElementById(`shortProgress-${idx}`);
+      const status = document.getElementById(`shortStatus-${idx}`);
+      const time = document.getElementById(`shortTime-${idx}`);
+      const phase = document.getElementById(`shortPhase-${idx}`);
+      const percent = document.getElementById(`shortPercent-${idx}`);
+      if (bar) {
+        bar.style.width = `${dl.percent || 0}%`;
+        bar.className = `h-full rounded-full transition-all duration-200 ${dl.status === 'done' ? 'bg-emerald-400' : dl.status === 'error' ? 'bg-rose-400' : 'bg-sky-400'}`;
+      }
+      if (status) {
+        status.textContent = dl.status === 'done' ? '✓ Downloaded' : dl.status === 'error' ? 'Download failed' : dl.phase || 'Preparing video…';
+        status.className = `text-[10px] font-semibold ${dl.status === 'done' ? 'text-emerald-300' : dl.status === 'error' ? 'text-rose-300' : 'text-cyan-300'}`;
+      }
+      if (time) time.textContent = dl.status === 'done' ? '100%' : `${formatTime(dl.elapsed || 0)} / ${formatTime(dl.duration || state.clipLengthSec)}`;
+      if (phase) phase.textContent = dl.status === 'done' ? 'File saved to browser Downloads' : dl.phase || 'Preparing video…';
+      if (percent) percent.textContent = `${dl.percent || 0}%`;
+      const group = document.getElementById('shortDownloadButtons');
+      if (group) {
+        const btn = group.children[idx];
+        if (btn) {
+          btn.disabled = dl.status === 'working';
+          btn.className = `min-w-0 py-2 px-1 rounded-lg ${dl.status === 'done' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : dl.status === 'working' ? 'bg-slate-700 text-slate-400' : 'emerald-cyan-btn text-slate-950'} text-[10px] font-extrabold cursor-pointer disabled:opacity-70`;
+          btn.textContent = dl.status === 'done' ? `✓ Short ${idx + 1}` : dl.status === 'working' ? `… Short ${idx + 1}` : `⬇ Short ${idx + 1}`;
+        }
+      }
     }
 
     // =========================================================================
@@ -1422,6 +1491,10 @@
       sourceVideo.crossOrigin = 'anonymous';
       if (proj.isRealVideo) sourceVideo.src = proj.videoUrl;
 
+      const estimatedDuration = proj.isRealVideo
+        ? Math.max(1, Math.min(state.clipLengthSec || 30, (previewVideo.duration || state.clipLengthSec) - Math.max(0, clip.startSec || 0)))
+        : Math.max(1, state.clipLengthSec || 30);
+      updateShortDownloadUI(idx, { status: 'working', phase: 'Preparing video…', percent: 0, elapsed: 0, duration: estimatedDuration });
       showToast(`Preparing Short #${idx + 1} • ${quality}...`);
 
       return await new Promise(async resolve => {
@@ -1430,6 +1503,7 @@
         let rafId = 0;
         let settled = false;
         let recorder = null;
+        let dlDuration = estimatedDuration;
         const chunks = [];
         const finish = (success, message) => {
           if (settled) return;
@@ -1441,6 +1515,12 @@
           sourceVideo.pause();
           sourceVideo.removeAttribute('src');
           sourceVideo.load();
+          if (success) {
+            updateShortDownloadUI(idx, { status: 'done', phase: 'Downloaded successfully', percent: 100, elapsed: dlDuration || estimatedDuration, duration: dlDuration || estimatedDuration });
+          } else {
+            updateShortDownloadUI(idx, { status: 'error', phase: message || 'Export failed', percent: 0 });
+          }
+          renderViralShortsPanel();
           if (message) showToast(message);
           resolve(success);
         };
@@ -1458,6 +1538,8 @@
           const duration = proj.isRealVideo
             ? Math.max(0.1, Math.min(state.clipLengthSec || 30, sourceVideo.duration - Math.max(0, clip.startSec || 0)))
             : Math.max(1, state.clipLengthSec || 30);
+          dlDuration = duration;
+          updateShortDownloadUI(idx, { status: 'working', phase: 'Recording clip…', percent: 0, elapsed: 0, duration });
           const sourceStartTime = proj.isRealVideo ? Math.max(0, clip.startSec || 0) : 0;
           const sourceEndTime = sourceStartTime + duration;
 
@@ -1558,6 +1640,11 @@
             if (now - lastDrawAt >= frameInterval) {
               drawCover(sourceVideo);
               lastDrawAt = now;
+              const elapsed = proj.isRealVideo
+                ? Math.max(0, sourceVideo.currentTime - sourceStartTime)
+                : Math.max(0, (now - startedAt) / 1000);
+              const pct = Math.min(99, Math.floor((elapsed / duration) * 100));
+              updateShortDownloadUI(idx, { status: 'working', phase: 'Creating video file…', percent: pct, elapsed, duration });
             }
             const ended = proj.isRealVideo
               ? (sourceVideo.ended || sourceVideo.currentTime >= sourceEndTime - 0.04)
@@ -1589,11 +1676,14 @@
       if (!proj || !proj.clips.length) return;
       exportQueueRunning = true;
       try {
-        // Strictly one at a time: prevents shared-media clock collisions and lost audio.
+        // Sequential queue: the per-clip progress indicators identify exactly which file is exporting.
+        let completed = 0;
         for (let i = 0; i < proj.clips.length; i++) {
-          await downloadSingleShort(i);
+          showToast(`Downloading Short ${i + 1} of ${proj.clips.length}...`);
+          const ok = await downloadSingleShort(i);
+          if (ok) completed++;
         }
-        showToast('All Shorts export attempts are complete.');
+        showToast(`${completed} of ${proj.clips.length} Shorts downloaded successfully.`);
       } finally {
         exportQueueRunning = false;
       }
