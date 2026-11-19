@@ -943,9 +943,8 @@
         videoEl.onloadedmetadata = () => {
           const total = Math.max(5, Math.floor(videoEl.duration));
           proj.duration = formatTime(total);
-          proj.clips.forEach((c, idx) => {
-            c.startSec = Math.floor((total / proj.clips.length) * idx);
-          });
+          // Keep the clip positions selected by the analysis engine.
+          // Do not reset them to evenly spaced positions when metadata loads.
         };
 
         // Do not autoplay while the browser is still loading/decoding a large upload.
@@ -1089,50 +1088,83 @@
       showToast(`Clip Length: ${state.clipLengthSec} sec`);
     }
 
-    // Local audio-activity ranking. This detects louder/dynamic sections,
-    // not story meaning; true semantic virality requires speech transcription/AI.
+    // Sample audio activity at many positions across the full uploaded video.
+    // This is a lightweight loudness/dynamics heuristic, not semantic AI or a virality guarantee.
     async function findHighActivityMoments(project, count, clipSeconds) {
-      const video = document.getElementById('realVideoElement');
-      const total = Number.isFinite(video.duration) ? video.duration : 0;
-      const maxStart = Math.max(0, total - clipSeconds);
-      const fallback = () => Array.from({length:count},(_,i)=>Math.floor(maxStart*i/Math.max(1,count-1)));
+      const probe = document.createElement('video');
+      probe.preload = 'auto';
+      probe.playsInline = true;
+      probe.muted = false;
+      probe.volume = 1;
+      probe.src = project.videoUrl;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) throw new Error('Web Audio is unavailable in this browser');
+
+      let audioContext, analyser, source;
       try {
-        const response = await fetch(project.videoUrl);
-        const bytes = await response.arrayBuffer();
-        const AC = window.AudioContext || window.webkitAudioContext;
-        const ctx = new AC();
-        const decoded = await ctx.decodeAudioData(bytes.slice(0));
-        const channels = Array.from({length:decoded.numberOfChannels},(_,i)=>decoded.getChannelData(i));
-        const hop = Math.max(1,Math.floor(decoded.sampleRate*1.5));
-        const frame = Math.max(1,Math.floor(decoded.sampleRate*0.25));
-        const energy=[];
-        for(let s=0;s+frame<decoded.length;s+=hop){
-          let sum=0,n=0;
-          for(const ch of channels) for(let j=s;j<s+frame;j+=4){sum+=ch[j]*ch[j];n++;}
-          energy.push({t:s/decoded.sampleRate,r:Math.sqrt(sum/Math.max(1,n))});
+        await new Promise((resolve,reject) => {
+          const timer=setTimeout(()=>reject(new Error('Video metadata timeout')),20000);
+          probe.onloadedmetadata=()=>{clearTimeout(timer);resolve();};
+          probe.onerror=()=>{clearTimeout(timer);reject(new Error('Cannot read uploaded video'));};
+          probe.load();
+        });
+        const total=probe.duration;
+        if(!Number.isFinite(total)||total<=0) throw new Error('Invalid video duration');
+        const maxStart=Math.max(0,total-clipSeconds);
+        const sampleCount=Math.min(24,Math.max(10,Math.ceil(total/90)));
+        audioContext=new AC();
+        analyser=audioContext.createAnalyser();
+        analyser.fftSize=2048;
+        source=audioContext.createMediaElementSource(probe);
+        source.connect(analyser);
+        analyser.connect(audioContext.destination);
+        await audioContext.resume();
+
+        const samples=[];
+        for(let i=0;i<sampleCount;i++){
+          const start=maxStart*i/Math.max(1,sampleCount-1);
+          await new Promise((resolve,reject)=>{
+            const timer=setTimeout(()=>reject(new Error('Seek timeout')),12000);
+            probe.onseeked=()=>{clearTimeout(timer);resolve();};
+            probe.currentTime=start;
+          });
+          const playPromise=probe.play();
+          if(playPromise) await playPromise;
+          const readings=[];
+          const began=performance.now();
+          while(performance.now()-began<1100){
+            const data=new Float32Array(analyser.fftSize);
+            analyser.getFloatTimeDomainData(data);
+            let sum=0,peak=0;
+            for(let j=0;j<data.length;j+=4){const v=data[j];sum+=v*v;peak=Math.max(peak,Math.abs(v));}
+            readings.push({rms:Math.sqrt(sum/Math.max(1,data.length/4)),peak});
+            await new Promise(resolve=>setTimeout(resolve,100));
+          }
+          probe.pause();
+          const mean=readings.reduce((s,x)=>s+x.rms,0)/Math.max(1,readings.length);
+          const peak=Math.max(0,...readings.map(x=>x.peak));
+          const variation=readings.length>1
+            ? Math.sqrt(readings.reduce((s,x)=>s+(x.rms-mean)**2,0)/readings.length) : 0;
+          samples.push({start,score:mean*.5+peak*.25+variation*.25});
         }
-        await ctx.close();
-        const candidates=[];
-        const step=Math.max(3,Math.floor(clipSeconds/5));
-        for(let start=0;start<=maxStart;start+=step){
-          const vals=energy.filter(e=>e.t>=start&&e.t<start+clipSeconds).map(e=>e.r);
-          if(!vals.length) continue;
-          const mean=vals.reduce((x,y)=>x+y,0)/vals.length;
-          const peak=Math.max(...vals);
-          const variance=vals.reduce((x,y)=>x+(y-mean)**2,0)/vals.length;
-          candidates.push({start,score:mean*.55+peak*.25+Math.sqrt(variance)*.20});
-        }
-        candidates.sort((x,y)=>y.score-x.score);
+        samples.sort((x,y)=>y.score-x.score);
         const chosen=[];
-        for(const item of candidates){
-          if(chosen.every(x=>Math.abs(x.start-item.start)>=clipSeconds*.8)) chosen.push(item);
+        for(const item of samples){
+          if(chosen.every(x=>Math.abs(x.start-item.start)>=clipSeconds*.75)) chosen.push(item);
           if(chosen.length===count) break;
         }
-        if(chosen.length<count) return fallback();
+        if(!chosen.length) throw new Error('No audio activity could be measured');
+        while(chosen.length<count){
+          const fallback=maxStart*chosen.length/Math.max(1,count-1);
+          if(chosen.every(x=>Math.abs(x.start-fallback)>=clipSeconds*.5)) chosen.push({start:fallback,score:0});
+          else break;
+        }
         return chosen.sort((x,y)=>x.start-y.start).map(x=>x.start);
-      } catch(err) {
-        console.warn('Audio activity analysis unavailable; using evenly spaced moments.',err);
-        return fallback();
+      } finally {
+        probe.pause();
+        probe.removeAttribute('src');
+        probe.load();
+        if(audioContext && audioContext.state!=='closed') await audioContext.close();
       }
     }
 
@@ -1159,11 +1191,11 @@
         fill.style.width='35%';
         const starts=await findHighActivityMoments(proj,count,duration);
         fill.style.width='85%'; head.textContent='Ranking candidate moments…';
-        sub.textContent='Selecting high-activity sections for your review';
+        sub.textContent='Comparing sampled audio moments across the full video';
         proj.clips=starts.map((startSec,idx)=>({
-          id:`rc-${idx+1}`,score:Math.max(70,96-idx*4),
+          id:`rc-${idx+1}`,score:Math.max(0,Math.round(100-idx*7)),
           duration:formatTime(duration),startSec,
-          hook:`High-activity moment • ${formatTime(startSec)}`,lines:[]
+          hook:`Audio highlight • ${formatTime(startSec)}`,lines:[]
         }));
         fill.style.width='100%';
         head.textContent='Candidate moments ready';
@@ -1171,7 +1203,7 @@
         await new Promise(resolve=>setTimeout(resolve,300));
         overlay.classList.add('hidden');
         renderTimelineClips(); renderViralShortsPanel(); selectViralClip(0);
-        showToast('Candidate moments selected by audio activity. Review before publishing.');
+        showToast('Audio highlights selected across the video. Review them before publishing; this is not a semantic virality prediction.');
       } catch(err) {
         console.error('Moment analysis error:',err);
         overlay.classList.add('hidden');
@@ -1514,6 +1546,9 @@
       return await new Promise(async resolve => {
         let canvasStream = null;
         let sourceStream = null;
+        let exportAudioContext = null;
+        let exportMediaSource = null;
+        let exportAudioDestination = null;
         let rafId = 0;
         let settled = false;
         let recorder = null;
@@ -1526,6 +1561,7 @@
           try { if (recorder && recorder.state !== 'inactive') recorder.stop(); } catch (_) {}
           if (canvasStream) canvasStream.getTracks().forEach(t => t.stop());
           if (sourceStream) sourceStream.getTracks().forEach(t => t.stop());
+          if (exportAudioContext && exportAudioContext.state !== 'closed') exportAudioContext.close().catch(()=>{});
           sourceVideo.pause();
           sourceVideo.removeAttribute('src');
           sourceVideo.load();
@@ -1581,10 +1617,15 @@
           const tracks = [...canvasStream.getVideoTracks()];
 
           if (proj.isRealVideo) {
-            const capture = sourceVideo.captureStream || sourceVideo.mozCaptureStream;
-            if (!capture) throw new Error('Audio capture is not supported by this browser');
-            sourceStream = capture.call(sourceVideo);
-            const audioTracks = sourceStream.getAudioTracks();
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) throw new Error('Web Audio is not supported by this browser');
+            exportAudioContext = new AudioContextClass();
+            exportMediaSource = exportAudioContext.createMediaElementSource(sourceVideo);
+            exportAudioDestination = exportAudioContext.createMediaStreamDestination();
+            exportMediaSource.connect(exportAudioDestination);
+            exportMediaSource.connect(exportAudioContext.destination);
+            await exportAudioContext.resume();
+            const audioTracks = exportAudioDestination.stream.getAudioTracks();
             if (!audioTracks.length) throw new Error('No audio track found in the uploaded video');
             audioTracks.forEach(track => tracks.push(track));
           }
