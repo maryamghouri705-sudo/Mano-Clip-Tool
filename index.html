@@ -1168,7 +1168,177 @@
       }
     }
 
+    // Lightweight browser-only speech analysis. No Python, Ollama, or local server.
+    let manoWhisperPromise = null;
+
+    async function getManoWhisper() {
+      if (!manoWhisperPromise) {
+        manoWhisperPromise = (async () => {
+          const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2');
+          return await pipeline(
+            'automatic-speech-recognition',
+            'onnx-community/whisper-tiny.en',
+            { dtype: 'q8' }
+          );
+        })();
+      }
+      try {
+        return await manoWhisperPromise;
+      } catch (error) {
+        manoWhisperPromise = null;
+        throw error;
+      }
+    }
+
+    async function transcribeVideoInBrowser(file, onProgress) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) throw new Error('This browser cannot read the video audio. Please use the latest Chrome or Edge.');
+      const decodeContext = new AudioContextClass();
+      let decoded;
+      try {
+        const bytes = await file.arrayBuffer();
+        decoded = await decodeContext.decodeAudioData(bytes);
+      } finally {
+        if (decodeContext.state !== 'closed') await decodeContext.close();
+      }
+
+      const sampleRate = 16000;
+      const frameCount = Math.ceil(decoded.duration * sampleRate);
+      const offline = new OfflineAudioContext(1, frameCount, sampleRate);
+      const source = offline.createBufferSource();
+      source.buffer = decoded;
+      source.connect(offline.destination);
+      source.start(0);
+      const monoAudio = await offline.startRendering();
+      const audioData = monoAudio.getChannelData(0);
+
+      onProgress(18, 'Loading compact speech model…', 'The first use downloads a small model into your browser cache');
+      const transcriber = await getManoWhisper();
+      onProgress(38, 'Listening to the full video…', 'Speech is processed in short overlapping sections');
+      const result = await transcriber(audioData, {
+        sampling_rate: sampleRate,
+        chunk_length_s: 30,
+        stride_length_s: 5,
+        return_timestamps: true
+      });
+      const chunks = (result && result.chunks) ? result.chunks : [];
+      if (!chunks.length && result && result.text) {
+        chunks.push({ timestamp: [0, decoded.duration], text: result.text });
+      }
+      return { chunks, duration: decoded.duration };
+    }
+
+    function rankTranscriptMoments(chunks, videoDuration, clipDuration, wantedCount) {
+      const windows = [];
+      const step = Math.max(8, Math.round(clipDuration * 0.45));
+      const span = Math.min(clipDuration, Math.max(15, videoDuration));
+      const signals = [
+        /\\b(never|secret|truth|shocking|surprised|mistake|wrong|right|worst|best|changed|real reason|finally|actually)\\b/gi,
+        /\\b(because|but|however|although|instead|turns out|the problem|the reason)\\b/gi,
+        /\\b(fear|afraid|love|hate|angry|cry|regret|heart|family|money|life|death|fail|success)\\b/gi,
+        /[?!]/g
+      ];
+      for (let start = 0; start + 3 < videoDuration; start += step) {
+        const end = Math.min(videoDuration, start + span);
+        const text = chunks
+          .filter(item => {
+            const ts = item.timestamp || [0, 0];
+            return Number(ts[1] ?? 0) > start && Number(ts[0] ?? 0) < end;
+          })
+          .map(item => item.text || '')
+          .join(' ')
+          .replace(/\\s+/g, ' ')
+          .trim();
+        if (text.split(/\\s+/).length < 18) continue;
+        const words = text.split(/\\s+/).length;
+        const hits = signals.reduce((sum, re) => sum + (text.match(re) || []).length, 0);
+        const personal = (text.match(/\\b(I|we|my|our|you)\\b/gi) || []).length;
+        const score = Math.min(98, Math.round(
+          28 + Math.min(words, 115) * 0.18 + Math.min(hits, 9) * 4.2 +
+          Math.min(personal, 12) * 1.1
+        ));
+        const clean = text.replace(/^[,.;:!?\\s]+/, '');
+        const hook = clean.length > 78 ? clean.slice(0, 75).replace(/\\s+\\S*$/, '') + '…' : clean;
+        windows.push({
+          start: Math.max(0, start),
+          end,
+          score,
+          hook: hook || 'Interesting spoken moment',
+          reason: 'Selected from the full-video transcript using speech density, emphasis, and story-related language.',
+          category: hits >= 5 ? 'story' : 'opinion'
+        });
+      }
+
+      windows.sort((a, b) => b.score - a.score);
+      const chosen = [];
+      for (const item of windows) {
+        if (chosen.every(x => Math.abs(x.start - item.start) >= Math.max(18, clipDuration * 0.85))) {
+          chosen.push(item);
+        }
+        if (chosen.length >= wantedCount) break;
+      }
+      chosen.sort((a, b) => a.start - b.start);
+      return chosen;
+    }
+
     async function startViralClippingEngine() {
+      audioEngine.unlock();
+      const proj=getActiveProject(); if(!proj) return;
+      const overlay=document.getElementById('clippingLoaderOverlay');
+      const fill=document.getElementById('loaderProgressFill');
+      const head=document.getElementById('loaderHeadline');
+      const sub=document.getElementById('loaderSubtext');
+      const preview = document.getElementById('realVideoElement');
+      if (!proj.isRealVideo || !proj.sourceFile) {
+        showToast('Please upload a video file first to use the Viral Clips finder.');
+        return;
+      }
+      if (preview && !preview.paused) preview.pause();
+      state.isPlaying = false;
+      updatePlaybackIcons();
+      overlay.classList.remove('hidden');
+      fill.style.width='8%';
+      head.textContent='Preparing your video…';
+      sub.textContent='No extra desktop software or local server is needed';
+      try {
+        const mode=document.getElementById('clipsModeSelect')?.value||'3';
+        const count=mode==='5'?5:3;
+        const duration=Math.max(15,Math.min(90,state.clipLengthSec||30));
+        const transcript = await transcribeVideoInBrowser(proj.sourceFile, (percent, title, detail) => {
+          fill.style.width=percent+'%';
+          head.textContent=title;
+          sub.textContent=detail;
+        });
+        fill.style.width='78%';
+        head.textContent='Finding different interesting moments…';
+        sub.textContent='Checking the transcript across the whole video';
+        const moments = rankTranscriptMoments(transcript.chunks, transcript.duration, duration, count);
+        if (!moments.length) throw new Error('No clear speech was found. Please try a video with spoken audio.');
+        proj.clips=moments.map((clip,idx)=>({
+          id:`browser-ai-${idx+1}`,
+          score:clip.score,
+          duration:formatTime(duration),
+          startSec:clip.start,
+          hook:clip.hook,
+          reason:clip.reason,
+          category:clip.category,
+          lines:[]
+        }));
+        fill.style.width='100%';
+        head.textContent='Your clip moments are ready';
+        sub.textContent=`Scanned the full ${formatTime(transcript.duration)} video · ${transcript.chunks.length} speech sections`;
+        await new Promise(resolve=>setTimeout(resolve,350));
+        overlay.classList.add('hidden');
+        renderTimelineClips(); renderViralShortsPanel(); selectViralClip(0);
+        showToast(`Found ${proj.clips.length} different spoken moments across the full video.`);
+      } catch(err) {
+        console.error('Viral clips analysis error:',err);
+        overlay.classList.add('hidden');
+        showToast(err.message || 'Could not analyse this video. Please try again in Chrome or Edge.');
+      }
+    }
+
+
       audioEngine.unlock();
       const proj=getActiveProject(); if(!proj) return;
       const overlay=document.getElementById('clippingLoaderOverlay');
