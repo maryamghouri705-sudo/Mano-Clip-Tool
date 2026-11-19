@@ -888,7 +888,7 @@
 
       state.projects.unshift(newProj);
       renderProjectsGrid();
-      openStudioForProject(newProj.id, true);
+      openStudioForProject(newProj.id, false);
     }
 
     function createFromPasteUrl() {
@@ -931,7 +931,7 @@
 
       if (proj.isRealVideo && proj.videoUrl) {
         videoEl.pause();
-        videoEl.preload = 'auto';
+        videoEl.preload = 'metadata';
         videoEl.playsInline = true;
         videoEl.src = proj.videoUrl;
         videoEl.load();
@@ -948,13 +948,10 @@
           });
         };
 
-        videoEl.play().then(() => {
-          state.isPlaying = true;
-          updatePlaybackIcons();
-        }).catch(() => {
-          state.isPlaying = false;
-          updatePlaybackIcons();
-        });
+        // Do not autoplay while the browser is still loading/decoding a large upload.
+        // Let the user start playback after the preview is ready.
+        state.isPlaying = false;
+        updatePlaybackIcons();
       } else {
         videoEl.pause();
         videoEl.classList.add('hidden');
@@ -1146,6 +1143,12 @@
       const fill=document.getElementById('loaderProgressFill');
       const head=document.getElementById('loaderHeadline');
       const sub=document.getElementById('loaderSubtext');
+      // Audio analysis decodes the uploaded media and can be CPU/memory intensive.
+      // Pause preview first so playback does not compete with the analysis workload.
+      const preview = document.getElementById('realVideoElement');
+      if (proj.isRealVideo && preview && !preview.paused) preview.pause();
+      state.isPlaying = false;
+      updatePlaybackIcons();
       overlay.classList.remove('hidden');
       fill.style.width='15%'; head.textContent='Analysing audio activity…';
       sub.textContent='Scanning uploaded video for strong moments';
