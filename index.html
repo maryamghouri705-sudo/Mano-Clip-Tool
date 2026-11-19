@@ -477,6 +477,7 @@
               <label class="text-xs font-medium text-slate-300">Quality</label>
               <select id="qualitySelect" onchange="showToast('Render Quality: ' + this.value)" class="w-44 px-3 py-2 rounded-xl sapphire-input text-xs font-bold text-white cursor-pointer">
                 <option value="1080p">1080p (Full HD)</option>
+                <option value="2K">2K (1440p)</option>
                 <option value="4K">4K Ultra HD</option>
                 <option value="720p">720p Fast</option>
               </select>
@@ -499,7 +500,7 @@
         <!-- Bottom Download All Button -->
         <button onclick="downloadAllViralShorts()" class="w-full py-3 px-4 rounded-xl bg-white hover:bg-slate-100 text-slate-950 font-extrabold text-xs transition flex items-center justify-center gap-2 shadow-lg cursor-pointer">
           <span>⬇</span>
-          <span>Download All Shorts (1080p)</span>
+          <span>Download All Shorts (Selected Quality)</span>
         </button>
       </section>
 
@@ -959,6 +960,7 @@
 
       if (proj.isRealVideo && proj.videoUrl) {
         videoEl.src = proj.videoUrl;
+        setupAutoBrollVideo(proj.videoUrl);
         videoEl.muted = audioEngine.isMuted;
         videoEl.volume = audioEngine.volume;
         videoEl.classList.remove('hidden');
@@ -1386,6 +1388,28 @@
       box.innerHTML = `<div class="${wrap}">${htmlWords}</div>`;
     }
 
+    // A second, muted video element supplies moving cutaway footage from the
+    // uploaded source. It stays independent of the main player timeline.
+    function setupAutoBrollVideo(src) {
+      if (!src) return;
+      let broll = document.getElementById('autoBrollSourceVideo');
+      if (!broll) {
+        broll = document.createElement('video');
+        broll.id = 'autoBrollSourceVideo';
+        broll.muted = true;
+        broll.loop = true;
+        broll.playsInline = true;
+        broll.preload = 'auto';
+        broll.style.display = 'none';
+        document.body.appendChild(broll);
+      }
+      if (broll.src !== src) {
+        broll.src = src;
+        broll.load();
+      }
+      broll.play().catch(() => {});
+    }
+
     function renderAutoBrollOverlay(t, clip) {
       const box = document.getElementById('autoBrollBox');
       if (state.brollMode === 'off') {
@@ -1394,88 +1418,244 @@
       }
 
       const cycle = t % 6;
-      if (cycle >= 2.2 && cycle <= 5.0) {
-        box.classList.remove('hidden');
-        const c = document.getElementById('brollVisualCanvas');
-        const ctx = c.getContext('2d');
-        c.width = 250;
-        c.height = 96;
+      const active = cycle >= 2.2 && cycle <= 5.0;
+      if (!active) {
+        box.classList.add('hidden');
+        return;
+      }
 
-        const g = ctx.createLinearGradient(0, 0, 250, 96);
+      const proj = getActiveProject();
+      const broll = document.getElementById('autoBrollSourceVideo');
+      const mainVideo = document.getElementById('realVideoElement');
+      const canvas = document.getElementById('brollVisualCanvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = 500;
+      canvas.height = 192;
+      box.classList.remove('hidden');
+
+      if (proj.isRealVideo && broll && broll.readyState >= 2) {
+        // Show a different time from the source as a moving picture-in-picture cutaway.
+        const duration = broll.duration || 0;
+        if (duration > 1 && !broll.seeking) {
+          const wanted = (Math.max(0, (mainVideo.currentTime || 0) + 8) % duration);
+          if (Math.abs(broll.currentTime - wanted) > 1.25) {
+            try { broll.currentTime = wanted; } catch (_) {}
+          }
+        }
+        try {
+          const pad = state.brollMode === 'subtle' ? 8 : 0;
+          ctx.fillStyle = '#020617';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(broll, pad, pad, canvas.width - pad * 2, canvas.height - pad * 2);
+          if (state.brollMode !== 'subtle') {
+            ctx.fillStyle = 'rgba(2,6,23,.68)';
+            ctx.fillRect(0, 142, canvas.width, 50);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 22px Inter, sans-serif';
+            ctx.fillText('AUTO B-ROLL', 18, 174);
+          }
+        } catch (_) {}
+      } else {
+        const g = ctx.createLinearGradient(0, 0, 500, 192);
         g.addColorStop(0, '#065f46');
         g.addColorStop(1, '#0e7490');
         ctx.fillStyle = g;
-        ctx.fillRect(0, 0, 250, 96);
-
+        ctx.fillRect(0, 0, 500, 192);
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 11px Inter, sans-serif';
-        ctx.fillText(clip.brollLabel, 10, 44);
-
-        ctx.fillStyle = '#a7f3d0';
-        ctx.font = '600 9px Inter, sans-serif';
-        ctx.fillText('Auto-Inserted Contextual B-Roll', 10, 64);
-      } else {
-        box.classList.add('hidden');
+        ctx.font = 'bold 22px Inter, sans-serif';
+        ctx.fillText('B-ROLL PREVIEW', 18, 82);
+        ctx.font = '16px Inter, sans-serif';
+        ctx.fillText('Upload a video to use moving cutaways', 18, 118);
       }
     }
 
     // =========================================================================
     // 9. ONE-CLICK EXPORT / DOWNLOAD SHORT
     // =========================================================================
-    function downloadSingleShort(idx) {
-      audioEngine.unlock();
-      audioEngine.playStudioPulse(659.25, 0.14);
+    async function downloadSingleShort(idx) {
       const proj = getActiveProject();
       const clip = proj.clips[idx] || proj.clips[0];
-      showToast(`Exporting Viral Short #${idx + 1} (1080p)...`);
-
-      const canvas = document.getElementById('shortExportCanvas');
-      const ctx = canvas.getContext('2d');
-      const w = canvas.width;
-      const h = canvas.height;
-
-      const grad = ctx.createLinearGradient(0, 0, w, h);
-      grad.addColorStop(0, '#070b14');
-      grad.addColorStop(0.5, '#0f172a');
-      grad.addColorStop(1, '#064e3b');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, w, h);
-
       const videoEl = document.getElementById('realVideoElement');
-      if (proj.isRealVideo && videoEl.readyState >= 2) {
-        const vw = videoEl.videoWidth || 1280;
-        const vh = videoEl.videoHeight || 720;
-        const cropW = vh * (9 / 16);
-        const sx = Math.max(0, (vw - cropW) / 2);
-        ctx.drawImage(videoEl, sx, 0, cropW, vh, 0, 0, w, h);
+      const quality = document.getElementById('qualitySelect')?.value || '1080p';
+      const dimensions = {
+        '720p': [720, 1280],
+        '1080p': [1080, 1920],
+        '2K': [1440, 2560],
+        '4K': [2160, 3840]
+      };
+      const [width, height] = dimensions[quality] || dimensions['1080p'];
+      const duration = Math.max(1, Math.min(state.clipLengthSec || 30, (proj.isRealVideo && videoEl.duration) ? Math.max(1, videoEl.duration - clip.startSec) : 30));
+      if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) {
+        showToast('This browser does not support video export. Please use updated Chrome or Edge.');
+        return;
+      }
+      if (proj.isRealVideo && videoEl.readyState < 2) {
+        showToast('Please wait until the uploaded video is ready, then export again.');
+        return;
       }
 
-      ctx.fillStyle = '#10b981';
-      ctx.beginPath();
-      ctx.roundRect(28, 36, 230, 36, 10);
-      ctx.fill();
-      ctx.fillStyle = '#022c22';
-      ctx.font = 'bold 15px Inter, sans-serif';
-      ctx.fillText(`🔥 ${clip.score}% VIRAL SHORT`, 42, 60);
+      audioEngine.unlock();
+      showToast(`Rendering Short #${idx + 1} • ${quality} video...`);
 
-      ctx.fillStyle = '#facc15';
-      ctx.font = '900 30px Montserrat, sans-serif';
-      ctx.fillText(clip.lines[0].words.join(' '), 28, h - 140);
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d', { alpha: false });
+      const fps = 30;
+      const canvasStream = canvas.captureStream(fps);
+      const tracks = [...canvasStream.getVideoTracks()];
+      let sourceStream = null;
 
-      ctx.fillStyle = '#34d399';
-      ctx.font = 'bold 14px Inter, sans-serif';
-      ctx.fillText(`Mano Clip Tool • ${state.captionStyle.toUpperCase()} • 1080p`, 28, h - 52);
+      if (proj.isRealVideo) {
+        try {
+          const capture = videoEl.captureStream || videoEl.mozCaptureStream;
+          if (capture) {
+            sourceStream = capture.call(videoEl);
+            sourceStream.getAudioTracks().forEach(track => tracks.push(track));
+          }
+        } catch (err) {
+          console.warn('Original audio capture unavailable:', err);
+        }
+      }
+      const outputStream = new MediaStream(tracks);
+      const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+        .find(type => MediaRecorder.isTypeSupported(type)) || '';
+      let recorder;
+      try {
+        recorder = new MediaRecorder(outputStream, mimeType ? { mimeType, videoBitsPerSecond: quality === '4K' ? 18000000 : quality === '2K' ? 12000000 : 8000000 } : undefined);
+      } catch (err) {
+        canvasStream.getTracks().forEach(track => track.stop());
+        showToast('Could not start video encoder in this browser.');
+        return;
+      }
 
-      canvas.toBlob(blob => {
-        if (!blob) return;
+      const chunks = [];
+      recorder.ondataavailable = event => { if (event.data && event.data.size) chunks.push(event.data); };
+      recorder.onerror = () => showToast('Video export failed. Please try 1080p in Chrome or Edge.');
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: recorder.mimeType || 'video/webm' });
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `ManoClipTool_Short_${idx + 1}_1080p.png`;
+        a.href = url;
+        a.download = `ManoClipTool_Short_${idx + 1}_${quality}.webm`;
         document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
-        showToast(`✅ Short #${idx + 1} Downloaded!`);
-      }, 'image/png');
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        canvasStream.getTracks().forEach(track => track.stop());
+        if (sourceStream) sourceStream.getTracks().forEach(track => track.stop());
+        showToast(`Short #${idx + 1} video downloaded • ${quality}`);
+      };
+
+      const broll = document.getElementById('autoBrollSourceVideo');
+      const brollCanvas = document.getElementById('brollVisualCanvas');
+      const drawCover = (source, x, y, w, h) => {
+        if (!source || source.readyState < 2) return;
+        const sw = source.videoWidth || 1, sh = source.videoHeight || 1;
+        const scale = Math.max(w / sw, h / sh);
+        const cw = w / scale, ch = h / scale;
+        const sx = (sw - cw) / 2, sy = (sh - ch) / 2;
+        ctx.drawImage(source, sx, sy, cw, ch, x, y, w, h);
+      };
+      const drawFrame = () => {
+        ctx.fillStyle = '#050816';
+        ctx.fillRect(0, 0, width, height);
+        if (proj.isRealVideo) {
+          drawCover(videoEl, 0, 0, width, height);
+          if (state.brollMode !== 'off' && broll && broll.readyState >= 2) {
+            const bw = Math.round(width * (state.brollMode === 'subtle' ? 0.34 : 0.46));
+            const bh = Math.round(bw * 9 / 16);
+            const bx = width - bw - Math.round(width * 0.035);
+            const by = Math.round(height * 0.045);
+            ctx.save();
+            ctx.shadowColor = '#10b981';
+            ctx.shadowBlur = Math.max(8, width * 0.008);
+            ctx.strokeStyle = '#34d399';
+            ctx.lineWidth = Math.max(3, width * 0.003);
+            ctx.beginPath();
+            ctx.roundRect(bx, by, bw, bh, Math.max(12, width * 0.012));
+            ctx.clip();
+            drawCover(broll, bx, by, bw, bh);
+            ctx.restore();
+            ctx.fillStyle = 'rgba(2,6,23,.78)';
+            ctx.fillRect(bx, by + bh - Math.round(height * 0.035), bw, Math.round(height * 0.035));
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${Math.round(width * 0.018)}px Inter, sans-serif`;
+            ctx.fillText('AUTO B-ROLL', bx + Math.round(width * 0.015), by + bh - Math.round(height * 0.012));
+          }
+        } else {
+          const grad = ctx.createLinearGradient(0, 0, width, height);
+          grad.addColorStop(0, '#070b14'); grad.addColorStop(0.5, '#0f172a'); grad.addColorStop(1, '#064e3b');
+          ctx.fillStyle = grad; ctx.fillRect(0, 0, width, height);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = `900 ${Math.round(width * 0.045)}px Montserrat, sans-serif`;
+          ctx.fillText('MANO CLIP TOOL', width * 0.08, height * 0.45);
+        }
+
+        if (state.captionStyle !== 'clean' || true) {
+          const line = clip.lines[0]?.words?.join(' ') || clip.hook || '';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = 'rgba(0,0,0,.68)';
+          ctx.fillRect(width * 0.05, height * 0.79, width * 0.9, height * 0.09);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = `900 ${Math.round(width * 0.045)}px Montserrat, sans-serif`;
+          ctx.fillText(line, width / 2, height * 0.845, width * 0.84);
+          ctx.textAlign = 'left';
+        }
+      };
+
+      let rafId = 0;
+      let stopped = false;
+      let startAt = 0;
+      const stopExport = () => {
+        if (stopped) return;
+        stopped = true;
+        cancelAnimationFrame(rafId);
+        try { if (recorder.state !== 'inactive') recorder.stop(); } catch (_) {}
+      };
+      const tick = now => {
+        if (stopped) return;
+        if (!startAt) startAt = now;
+        drawFrame();
+        const elapsed = (now - startAt) / 1000;
+        if (elapsed >= duration) {
+          stopExport();
+          return;
+        }
+        rafId = requestAnimationFrame(tick);
+      };
+
+      const beginRecording = async () => {
+        try {
+          if (proj.isRealVideo) {
+            videoEl.pause();
+            videoEl.currentTime = Math.min(clip.startSec || 0, Math.max(0, videoEl.duration - 0.1));
+            await new Promise(resolve => {
+              if (Math.abs(videoEl.currentTime - (clip.startSec || 0)) < 0.15) return resolve();
+              const done = () => { videoEl.removeEventListener('seeked', done); resolve(); };
+              videoEl.addEventListener('seeked', done, { once: true });
+              setTimeout(resolve, 2000);
+            });
+            videoEl.muted = false;
+            videoEl.playbackRate = 1;
+            await videoEl.play();
+            if (broll && broll.readyState >= 2) {
+              const bDuration = broll.duration || 0;
+              if (bDuration > 1) {
+                try { broll.currentTime = ((clip.startSec || 0) + 8) % bDuration; } catch (_) {}
+              }
+              broll.play().catch(() => {});
+            }
+          }
+          recorder.start(250);
+          rafId = requestAnimationFrame(tick);
+          showToast('Recording video with B-Roll overlay and source audio...');
+        } catch (err) {
+          stopExport();
+          showToast('Could not play source video for export. Click Play once, then retry.');
+        }
+      };
+      beginRecording();
     }
 
     function downloadAllViralShorts() {
