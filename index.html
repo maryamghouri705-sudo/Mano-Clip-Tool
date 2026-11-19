@@ -876,48 +876,13 @@
       const cleanTitle = file.name.replace(/\.[^/.]+$/, '');
 
       const newProj = {
-        id: 'proj-' + Date.now(),
-        code: nextCode,
-        title: nextCode,
-        subtitle: cleanTitle,
-        duration: 'Auto',
-        aspect: '9:16',
-        isRealVideo: true,
-        videoUrl: objectUrl,
+        id: 'proj-' + Date.now(), code: nextCode, title: nextCode,
+        subtitle: cleanTitle, duration: 'Auto', aspect: '9:16',
+        isRealVideo: true, videoUrl: objectUrl,
         clips: [
-          {
-            id: 'rc-1',
-            score: 98,
-            duration: '0:30',
-            startSec: 0,
-            hook: `Viral Hook #1 — ${cleanTitle.slice(0, 26)}`,
-            lines: [
-              { words: ['THIS', 'MOMENT', 'CHANGES', 'EVERYTHING'], hi: 1 },
-              { words: ['WATCH', 'CLOSELY', 'WHAT', 'HAPPENS', 'NEXT'], hi: 0 },
-              { words: ['MOST', 'PEOPLE', 'NEVER', 'SEE', 'THIS'], hi: 3 }
-            ]
-          },
-          {
-            id: 'rc-2',
-            score: 94,
-            duration: '0:30',
-            startSec: 15,
-            hook: 'High-Engagement Story Peak',
-            lines: [
-              { words: ['HERE', 'IS', 'THE', 'BIGGEST', 'SECRET'], hi: 3 },
-              { words: ['SHARE', 'THIS', 'WITH', 'YOUR', 'FRIENDS'], hi: 0 }
-            ]
-          },
-          {
-            id: 'rc-3',
-            score: 91,
-            duration: '0:30',
-            startSec: 30,
-            hook: 'Unstoppable Viral Ending',
-            lines: [
-              { words: ['RESULTS', 'SPEAK', 'LOUDER', 'THAN', 'WORDS'], hi: 2 }
-            ]
-          }
+          { id: 'rc-1', score: 0, duration: '0:30', startSec: 0, hook: 'Analysing high-activity moment…', lines: [] },
+          { id: 'rc-2', score: 0, duration: '0:30', startSec: 30, hook: 'Analysing high-activity moment…', lines: [] },
+          { id: 'rc-3', score: 0, duration: '0:30', startSec: 60, hook: 'Analysing high-activity moment…', lines: [] }
         ]
       };
 
@@ -1127,48 +1092,88 @@
       showToast(`Clip Length: ${state.clipLengthSec} sec`);
     }
 
-    function startViralClippingEngine() {
-      audioEngine.unlock();
-      audioEngine.playStudioPulse(523.25, 0.14);
-
-      const overlay = document.getElementById('clippingLoaderOverlay');
-      const fill = document.getElementById('loaderProgressFill');
-      const head = document.getElementById('loaderHeadline');
-      const sub = document.getElementById('loaderSubtext');
-
-      overlay.classList.remove('hidden');
-      fill.style.width = '22%';
-
-      const steps = [
-        { w: '48%', h: 'Tracing Viral Hooks...', s: 'Finding high-retention speech peaks' },
-        { w: '78%', h: 'Preparing Short Segments...', s: 'Arranging selected video moments' },
-        { w: '100%', h: 'Syncing English Captions...', s: '3 Viral Shorts ready in 1080p!' }
-      ];
-
-      let i = 0;
-      const interval = setInterval(() => {
-        if (i < steps.length) {
-          fill.style.width = steps[i].w;
-          head.textContent = steps[i].h;
-          sub.textContent = steps[i].s;
-          i++;
-        } else {
-          clearInterval(interval);
-          setTimeout(() => {
-            overlay.classList.add('hidden');
-            audioEngine.playStudioPulse(783.99, 0.2);
-
-            // Light up Edit & Render steps
-            document.getElementById('stepEditPill').className = 'flex items-center gap-1.5 text-emerald-400 font-bold';
-            document.getElementById('stepRenderPill').className = 'flex items-center gap-1.5 text-cyan-300 font-bold';
-
-            renderTimelineClips();
-            renderViralShortsPanel();
-            selectViralClip(0);
-            showToast('✨ 3 Viral Shorts Extracted with Captions & Audio!');
-          }, 280);
+    // Local audio-activity ranking. This detects louder/dynamic sections,
+    // not story meaning; true semantic virality requires speech transcription/AI.
+    async function findHighActivityMoments(project, count, clipSeconds) {
+      const video = document.getElementById('realVideoElement');
+      const total = Number.isFinite(video.duration) ? video.duration : 0;
+      const maxStart = Math.max(0, total - clipSeconds);
+      const fallback = () => Array.from({length:count},(_,i)=>Math.floor(maxStart*i/Math.max(1,count-1)));
+      try {
+        const response = await fetch(project.videoUrl);
+        const bytes = await response.arrayBuffer();
+        const AC = window.AudioContext || window.webkitAudioContext;
+        const ctx = new AC();
+        const decoded = await ctx.decodeAudioData(bytes.slice(0));
+        const channels = Array.from({length:decoded.numberOfChannels},(_,i)=>decoded.getChannelData(i));
+        const hop = Math.max(1,Math.floor(decoded.sampleRate*1.5));
+        const frame = Math.max(1,Math.floor(decoded.sampleRate*0.25));
+        const energy=[];
+        for(let s=0;s+frame<decoded.length;s+=hop){
+          let sum=0,n=0;
+          for(const ch of channels) for(let j=s;j<s+frame;j+=4){sum+=ch[j]*ch[j];n++;}
+          energy.push({t:s/decoded.sampleRate,r:Math.sqrt(sum/Math.max(1,n))});
         }
-      }, 420);
+        await ctx.close();
+        const candidates=[];
+        const step=Math.max(3,Math.floor(clipSeconds/5));
+        for(let start=0;start<=maxStart;start+=step){
+          const vals=energy.filter(e=>e.t>=start&&e.t<start+clipSeconds).map(e=>e.r);
+          if(!vals.length) continue;
+          const mean=vals.reduce((x,y)=>x+y,0)/vals.length;
+          const peak=Math.max(...vals);
+          const variance=vals.reduce((x,y)=>x+(y-mean)**2,0)/vals.length;
+          candidates.push({start,score:mean*.55+peak*.25+Math.sqrt(variance)*.20});
+        }
+        candidates.sort((x,y)=>y.score-x.score);
+        const chosen=[];
+        for(const item of candidates){
+          if(chosen.every(x=>Math.abs(x.start-item.start)>=clipSeconds*.8)) chosen.push(item);
+          if(chosen.length===count) break;
+        }
+        if(chosen.length<count) return fallback();
+        return chosen.sort((x,y)=>x.start-y.start).map(x=>x.start);
+      } catch(err) {
+        console.warn('Audio activity analysis unavailable; using evenly spaced moments.',err);
+        return fallback();
+      }
+    }
+
+    async function startViralClippingEngine() {
+      audioEngine.unlock();
+      const proj=getActiveProject(); if(!proj) return;
+      const overlay=document.getElementById('clippingLoaderOverlay');
+      const fill=document.getElementById('loaderProgressFill');
+      const head=document.getElementById('loaderHeadline');
+      const sub=document.getElementById('loaderSubtext');
+      overlay.classList.remove('hidden');
+      fill.style.width='15%'; head.textContent='Analysing audio activity…';
+      sub.textContent='Scanning uploaded video for strong moments';
+      try {
+        const mode=document.getElementById('clipsModeSelect')?.value||'3';
+        const count=mode==='5'?5:3;
+        const duration=Math.max(15,Math.min(90,state.clipLengthSec||30));
+        fill.style.width='35%';
+        const starts=await findHighActivityMoments(proj,count,duration);
+        fill.style.width='85%'; head.textContent='Ranking candidate moments…';
+        sub.textContent='Selecting high-activity sections for your review';
+        proj.clips=starts.map((startSec,idx)=>({
+          id:`rc-${idx+1}`,score:Math.max(70,96-idx*4),
+          duration:formatTime(duration),startSec,
+          hook:`High-activity moment • ${formatTime(startSec)}`,lines:[]
+        }));
+        fill.style.width='100%';
+        head.textContent='Candidate moments ready';
+        sub.textContent='Review the selected sections before rendering';
+        await new Promise(resolve=>setTimeout(resolve,300));
+        overlay.classList.add('hidden');
+        renderTimelineClips(); renderViralShortsPanel(); selectViralClip(0);
+        showToast('Candidate moments selected by audio activity. Review before publishing.');
+      } catch(err) {
+        console.error('Moment analysis error:',err);
+        overlay.classList.add('hidden');
+        showToast('Could not analyse this video. Please try another MP4.');
+      }
     }
 
     function selectViralClip(idx) {
@@ -1415,6 +1420,12 @@
 
     function renderLiveCaptions(t, clip, speakAloud) {
       const box = document.getElementById('playerCaptionsBox');
+      // Demo captions are not a transcript. Keep uploaded footage free of invented overlay text.
+      if (!speakAloud) {
+        if (box.innerHTML) box.innerHTML = '';
+        box.dataset.key = '';
+        return;
+      }
       const lines = clip.lines;
       const lineIdx = Math.floor(t / 2.6) % lines.length;
       const lineObj = lines[lineIdx];
