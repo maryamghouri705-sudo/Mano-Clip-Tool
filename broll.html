@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mano B-Roll Studio</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,system-ui,Arial;background:#08111f;color:#eef6ff}
+*{box-sizing:border-box}body{margin:0;padding:24px;background:radial-gradient(circle at top,#142c43,#08111f 55%);min-height:100vh}
+main{max-width:1050px;margin:auto}.head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{margin:0;font-size:26px}.muted{color:#9db0c7;font-size:13px;line-height:1.5}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px}
+.panel{background:#101e30;border:1px solid #263d56;border-radius:16px;padding:16px}
+label{display:block;font-size:13px;color:#b8c9dc;margin:12px 0 7px}
+input,select,button{font:inherit}input[type=file],input[type=number],select{width:100%;padding:10px;background:#091625;border:1px solid #304860;border-radius:9px;color:#eef6ff}
+.preview{position:relative;width:min(100%,360px);aspect-ratio:9/16;background:#000;margin:14px auto;border-radius:14px;overflow:hidden}
+#mainVideo{width:100%;height:100%;object-fit:cover}
+#brollVideo{position:absolute;top:5%;right:5%;width:42%;aspect-ratio:16/9;object-fit:cover;border:2px solid #34d399;border-radius:9px;box-shadow:0 4px 20px #0009}
+.controls{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+button{border:0;border-radius:10px;padding:11px 16px;background:#34d399;color:#05251b;font-weight:800;cursor:pointer}
+button.secondary{background:#233950;color:#eaf4ff}button:disabled{opacity:.45;cursor:not-allowed}
+.status{min-height:22px;margin-top:12px;color:#8ce8c3;font-size:13px}
+small{color:#90a6bd}.full{grid-column:1/-1}
+@media(max-width:720px){.grid{grid-template-columns:1fr}body{padding:14px}}
+</style></head>
+<body><main>
+<div class="head"><div><h1>🎬 Mano B-Roll Studio</h1><p class="muted">Standalone B-Roll editor — upload your main short and a separate cutaway clip.</p></div><a href="./index.html" style="color:#7ddfc0">← Back to Mano Clip Tool</a></div>
+<div class="grid">
+<section class="panel">
+<h3>1. Main video</h3><label for="mainFile">Choose your main short</label><input id="mainFile" type="file" accept="video/*">
+<label for="duration">Export duration (seconds)</label><input id="duration" type="number" min="1" max="600" value="30">
+<label for="quality">Export resolution</label><select id="quality"><option value="1080">1080p Full HD</option><option value="1440">2K (1440p)</option><option value="2160">4K (2160p)</option></select>
+<div class="controls"><button class="secondary" id="playBtn" disabled>▶ Play preview</button><button class="secondary" id="pauseBtn" disabled>Ⅱ Pause</button></div>
+</section>
+<section class="panel">
+<h3>2. B-Roll video</h3><label for="brollFile">Choose a separate B-Roll clip</label><input id="brollFile" type="file" accept="video/*">
+<label for="size">Overlay size</label><select id="size"><option value=".34">Small</option><option value=".42" selected>Medium</option><option value=".5">Large</option></select>
+<label for="position">Overlay position</label><select id="position"><option value="tr">Top right</option><option value="tl">Top left</option><option value="br">Bottom right</option><option value="bl">Bottom left</option></select>
+<label><input id="showBroll" type="checkbox" checked style="width:auto;margin-right:7px">Include B-Roll in export</label>
+</section>
+<section class="panel full">
+<h3>3. Preview and export</h3>
+<div class="preview"><video id="mainVideo" playsinline controls></video><video id="brollVideo" playsinline muted loop></video></div>
+<div class="controls"><button id="exportBtn" disabled>⬇ Export short video</button><button id="stopBtn" class="secondary" disabled>Stop export</button></div>
+<div id="status" class="status">Choose a main video to begin. B-Roll is optional.</div>
+<p class="muted">Exports WebM in supported browsers (Chrome/Edge). The main video's original audio is included when browser capture supports it. High-resolution exports need a capable computer; try 1080p if playback or audio stutters.</p>
+</section></div></main>
+<script>
+const $=id=>document.getElementById(id);
+const main=$('mainVideo'), broll=$('brollVideo');
+let mainUrl=null,brollUrl=null,recorder=null,raf=0,canvasStream=null,sourceStream=null,stopping=false;
+function status(t){$('status').textContent=t}
+function loadVideo(input,video,which){
+ const file=input.files&&input.files[0];if(!file)return;
+ const url=URL.createObjectURL(file);
+ if(which==='main'){if(mainUrl)URL.revokeObjectURL(mainUrl);mainUrl=url;main.src=url;}
+ else{if(brollUrl)URL.revokeObjectURL(brollUrl);brollUrl=url;broll.src=url;}
+ video.load();video.onloadedmetadata=()=>{if(mainUrl&&main.readyState>=1)$('exportBtn').disabled=false;};
+}
+$('mainFile').onchange=()=>loadVideo($('mainFile'),main,'main');
+$('brollFile').onchange=()=>loadVideo($('brollFile'),broll,'broll');
+$('playBtn').onclick=async()=>{try{await main.play();if($('showBroll').checked&&brollUrl)await broll.play();status('Preview playing');}catch(e){status('Press Play again if the browser blocks autoplay.');}};
+$('pauseBtn').onclick=()=>{main.pause();broll.pause();};
+main.onloadedmetadata=()=>{$('playBtn').disabled=false;$('pauseBtn').disabled=false;$('exportBtn').disabled=false;};
+function drawCover(ctx,video,x,y,w,h){
+ if(!video||video.readyState<2)return;
+ const vw=video.videoWidth||1,vh=video.videoHeight||1,scale=Math.max(w/vw,h/vh),cw=w/scale,ch=h/scale;
+ ctx.drawImage(video,(vw-cw)/2,(vh-ch)/2,cw,ch,x,y,w,h);
+}
+function drawFrame(ctx,W,H){
+ ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);drawCover(ctx,main,0,0,W,H);
+ if($('showBroll').checked&&brollUrl&&broll.readyState>=2){
+  const frac=Number($('size').value),w=Math.round(W*frac),h=Math.round(w*9/16),pad=Math.round(W*.035),pos=$('position').value;
+  const x=pos.endsWith('r')?W-w-pad:pad,y=pos.startsWith('b')?H-h-pad:pad;
+  ctx.save();ctx.shadowColor='#34d399';ctx.shadowBlur=Math.max(6,W*.008);ctx.strokeStyle='#34d399';ctx.lineWidth=Math.max(2,W*.003);
+  ctx.beginPath();ctx.roundRect(x,y,w,h,Math.max(8,W*.012));ctx.clip();drawCover(ctx,broll,x,y,w,h);ctx.restore();
+ }
+}
+$('exportBtn').onclick=async()=>{
+ if(!main.src||!main.duration){status('Please load a valid main video first.');return;}
+ if(!window.MediaRecorder||!HTMLCanvasElement.prototype.captureStream){status('Video export is not supported in this browser. Use updated Chrome or Edge.');return;}
+ const quality=Number($('quality').value),W=quality,H=Math.round(quality*16/9),fps=24;
+ const duration=Math.min(Math.max(1,Number($('duration').value)||30),Math.max(1,main.duration-main.currentTime));
+ const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d',{alpha:false});
+ canvasStream=canvas.captureStream(fps);const tracks=[...canvasStream.getVideoTracks()];sourceStream=null;
+ try{const capture=main.captureStream||main.mozCaptureStream;if(capture){sourceStream=capture.call(main);sourceStream.getAudioTracks().forEach(t=>tracks.push(t));}}catch(e){}
+ const stream=new MediaStream(tracks);
+ const mime=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(t=>MediaRecorder.isTypeSupported(t))||'';
+ try{recorder=new MediaRecorder(stream,mime?{mimeType:mime,videoBitsPerSecond:quality===2160?14000000:quality===1440?9000000:6000000,audioBitsPerSecond:160000}:undefined);}
+ catch(e){status('Could not start the video encoder. Try 1080p.');return;}
+ const chunks=[];recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+ recorder.onerror=()=>status('Export failed. Try a lower resolution.');
+ recorder.onstop=()=>{
+  const blob=new Blob(chunks,{type:recorder.mimeType||'video/webm'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='Mano_Broll_Short_'+quality+'p.webm';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
+  if(canvasStream)canvasStream.getTracks().forEach(t=>t.stop());if(sourceStream)sourceStream.getTracks().forEach(t=>t.stop());
+  main.pause();broll.pause();$('stopBtn').disabled=true;$('exportBtn').disabled=false;status('Export complete — video downloaded.');
+ };
+ stopping=false;$('exportBtn').disabled=true;$('stopBtn').disabled=false;
+ const start=main.currentTime;
+ if($('showBroll').checked&&brollUrl){broll.currentTime=0;broll.play().catch(()=>{});}
+ recorder.start(1000);await main.play();
+ const startClock=performance.now();let last=0;
+ const frame=now=>{
+  if(stopping||!recorder||recorder.state==='inactive')return;
+  if(now-last>=1000/fps){drawFrame(ctx,W,H);last=now;}
+  if((performance.now()-startClock)/1000>=duration||main.ended){stopExport();return;}
+  raf=requestAnimationFrame(frame);
+ };
+ drawFrame(ctx,W,H);raf=requestAnimationFrame(frame);status('Exporting video with B-Roll and main-video audio…');
+};
+function stopExport(){
+ if(stopping)return;stopping=true;cancelAnimationFrame(raf);if(recorder&&recorder.state!=='inactive')recorder.stop();
+}
+$('stopBtn').onclick=()=>{stopExport();status('Stopping export…');};
+</script></body></html>
