@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mano Clip Tool — AI Viral Clipping & B-Roll Studio</title>
+  <title>Mano Clip Tool — AI Viral Clipping Studio</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -134,7 +134,7 @@
           <div class="space-y-1">
             <div class="text-sm font-extrabold text-white">Mano AI Studio</div>
             <p class="text-[11px] text-slate-400 leading-relaxed">
-              Auto viral clips, B-rolls & English captions ready in 1 click.
+              Auto viral clips & English captions ready in 1 click.
             </p>
           </div>
           <!-- Two Rounded Pill Buttons matching Capture 1 -->
@@ -269,16 +269,6 @@
               </select>
             </div>
 
-            <!-- Auto B-Rolls Dropdown -->
-            <div class="flex items-center justify-between gap-2">
-              <label class="text-xs font-medium text-slate-300 shrink-0">Auto B-Rolls</label>
-              <select id="brollModeSelect" onchange="changeBrollMode(this.value)" class="w-44 px-3 py-2 rounded-xl sapphire-input text-xs font-semibold text-cyan-300 cursor-pointer">
-                <option value="on">ON - Smart Cutaways</option>
-                <option value="subtle">Subtle Overlay</option>
-                <option value="off">Off</option>
-              </select>
-            </div>
-
             <!-- Clip Length Input with Stepper Buttons -->
             <div class="flex items-center justify-between gap-2">
               <label class="text-xs font-medium text-slate-300 shrink-0">Clip length</label>
@@ -352,15 +342,6 @@
             <!-- Built-In Studio Demo Canvas (For Sample Project 001) -->
             <canvas id="sampleStudioCanvas" class="w-full h-full block"></canvas>
 
-            <!-- Smart Auto B-Roll Cutaway Overlay -->
-            <div id="autoBrollBox" class="hidden absolute top-3.5 left-3.5 right-3.5 rounded-xl overflow-hidden border-2 border-emerald-400 shadow-2xl bg-[#070b14] z-10">
-              <div class="px-2.5 py-1 emerald-cyan-btn text-slate-950 text-[9px] font-black uppercase tracking-wider flex items-center justify-between">
-                <span>🎬 AUTO B-ROLL</span>
-                <span>Context Match</span>
-              </div>
-              <canvas id="brollVisualCanvas" class="w-full h-24 block"></canvas>
-            </div>
-
             <!-- Live Synced English Captions -->
             <div id="playerCaptionsBox" class="absolute bottom-9 left-3 right-3 text-center pointer-events-none select-none z-10">
               <!-- Rendered live -->
@@ -380,7 +361,7 @@
               </div>
               <div class="space-y-1">
                 <div id="loaderHeadline" class="text-xs font-extrabold text-white">Detecting Viral Hooks...</div>
-                <div id="loaderSubtext" class="text-[10px] text-emerald-300">Syncing Auto B-Rolls & English Captions</div>
+                <div id="loaderSubtext" class="text-[10px] text-emerald-300">Syncing English Captions</div>
               </div>
               <div class="w-full h-2 bg-white/10 rounded-full overflow-hidden">
                 <div id="loaderProgressFill" class="h-full emerald-cyan-btn transition-all duration-300" style="width: 20%"></div>
@@ -522,7 +503,7 @@
           ↑
         </div>
         <div class="text-sm font-extrabold text-white">Choose Video File (MP4 / MOV)</div>
-        <p class="text-xs text-slate-400">Auto-extracts viral 9:16 shorts with B-Rolls & sound</p>
+        <p class="text-xs text-slate-400">Auto-extracts viral 9:16 shorts with synced captions & sound</p>
       </div>
 
       <div class="space-y-2">
@@ -550,10 +531,6 @@
           <span class="font-bold text-emerald-400">English (All Styles)</span>
         </div>
         <div class="p-3 rounded-xl bg-[#080d1a] flex justify-between items-center">
-          <span class="text-slate-300">Auto B-Roll Engine</span>
-          <span class="font-bold text-cyan-400">Enabled (Smart Match)</span>
-        </div>
-        <div class="p-3 rounded-xl bg-[#080d1a] flex justify-between items-center">
           <span class="text-slate-300">Audio Output</span>
           <span class="font-bold text-emerald-400">100% Stereo Boost</span>
         </div>
@@ -573,7 +550,7 @@
       </div>
       <ol class="space-y-2.5 text-xs text-slate-300 list-decimal list-inside">
         <li>Click <strong>+ New Project</strong> (or open project <strong>001</strong>).</li>
-        <li>Click <strong>Start clipping ›</strong> to auto-detect viral moments, B-Rolls & English captions.</li>
+        <li>Click <strong>Start clipping ›</strong> to prepare viral moments & English captions.</li>
         <li>Press <strong>Play (▶)</strong> to hear full audio and click <strong>Download Short</strong>.</li>
       </ol>
       <button onclick="closeQuickGuideModal()" class="w-full py-2.5 rounded-xl emerald-cyan-btn text-slate-950 font-extrabold text-xs cursor-pointer">Got It!</button>
@@ -703,7 +680,6 @@
       activeProjectId: 'proj-001',
       selectedClipIdx: 0,
       captionStyle: 'hormozi',
-      brollMode: 'on',
       clipLengthSec: 30,
       isPlaying: false,
       sampleClock: 0,
@@ -960,7 +936,6 @@
 
       if (proj.isRealVideo && proj.videoUrl) {
         videoEl.src = proj.videoUrl;
-        setupAutoBrollVideo(proj.videoUrl);
         videoEl.muted = audioEngine.isMuted;
         videoEl.volume = audioEngine.volume;
         videoEl.classList.remove('hidden');
@@ -1112,14 +1087,6 @@
       showToast(`English Captions: ${style.toUpperCase()}`);
     }
 
-    function changeBrollMode(mode) {
-      state.brollMode = mode;
-      if (mode === 'off') {
-        document.getElementById('autoBrollBox').classList.add('hidden');
-      }
-      showToast(`Auto B-Rolls: ${mode.toUpperCase()}`);
-    }
-
     function adjustClipLength(delta) {
       state.clipLengthSec = Math.max(15, Math.min(90, state.clipLengthSec + delta));
       document.getElementById('clipLengthValue').textContent = state.clipLengthSec;
@@ -1140,7 +1107,7 @@
 
       const steps = [
         { w: '48%', h: 'Tracing Viral Hooks...', s: 'Finding high-retention speech peaks' },
-        { w: '78%', h: 'Inserting Auto B-Rolls...', s: 'Matching context-aware cutaways' },
+        { w: '78%', h: 'Preparing Short Segments...', s: 'Arranging selected video moments' },
         { w: '100%', h: 'Syncing English Captions...', s: '3 Viral Shorts ready in 1080p!' }
       ];
 
@@ -1164,7 +1131,7 @@
             renderTimelineClips();
             renderViralShortsPanel();
             selectViralClip(0);
-            showToast('✨ 3 Viral Shorts Extracted with B-Rolls & Audio!');
+            showToast('✨ 3 Viral Shorts Extracted with Captions & Audio!');
           }, 280);
         }
       }, 420);
@@ -1233,7 +1200,7 @@
               <span class="text-[10px] font-mono text-slate-400">0:${state.clipLengthSec}</span>
             </div>
             <div class="text-xs font-bold text-white leading-snug">#${idx + 1}: ${clip.hook}</div>
-            <div class="text-[10px] text-cyan-300">🎬 Auto B-Roll • ${state.captionStyle.toUpperCase()}</div>
+            <div class="text-[10px] text-cyan-300">✦ ${state.captionStyle.toUpperCase()} Captions</div>
           </div>
           <div class="flex gap-2">
             <button onclick="selectViralClip(${idx})" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-[11px] font-bold text-white cursor-pointer">▶ Play</button>
@@ -1276,7 +1243,6 @@
         document.getElementById('timeReadout').textContent = `${formatTime(curSec)} / ${formatTime(maxSec)}`;
 
         renderLiveCaptions(curSec, clip, !proj.isRealVideo);
-        renderAutoBrollOverlay(curSec, clip);
       }
 
       requestAnimationFrame(mainStudioLoop);
@@ -1388,87 +1354,6 @@
       box.innerHTML = `<div class="${wrap}">${htmlWords}</div>`;
     }
 
-    // A second, muted video element supplies moving cutaway footage from the
-    // uploaded source. It stays independent of the main player timeline.
-    function setupAutoBrollVideo(src) {
-      if (!src) return;
-      let broll = document.getElementById('autoBrollSourceVideo');
-      if (!broll) {
-        broll = document.createElement('video');
-        broll.id = 'autoBrollSourceVideo';
-        broll.muted = true;
-        broll.loop = true;
-        broll.playsInline = true;
-        broll.preload = 'auto';
-        broll.style.display = 'none';
-        document.body.appendChild(broll);
-      }
-      if (broll.src !== src) {
-        broll.src = src;
-        broll.load();
-      }
-      broll.play().catch(() => {});
-    }
-
-    function renderAutoBrollOverlay(t, clip) {
-      const box = document.getElementById('autoBrollBox');
-      if (state.brollMode === 'off') {
-        box.classList.add('hidden');
-        return;
-      }
-
-      const cycle = t % 6;
-      const active = cycle >= 2.2 && cycle <= 5.0;
-      if (!active) {
-        box.classList.add('hidden');
-        return;
-      }
-
-      const proj = getActiveProject();
-      const broll = document.getElementById('autoBrollSourceVideo');
-      const mainVideo = document.getElementById('realVideoElement');
-      const canvas = document.getElementById('brollVisualCanvas');
-      const ctx = canvas.getContext('2d');
-      canvas.width = 500;
-      canvas.height = 192;
-      box.classList.remove('hidden');
-
-      if (proj.isRealVideo && broll && broll.readyState >= 2) {
-        // Show a different time from the source as a moving picture-in-picture cutaway.
-        const duration = broll.duration || 0;
-        if (duration > 1 && !broll.seeking) {
-          const wanted = (Math.max(0, (mainVideo.currentTime || 0) + 8) % duration);
-          if (Math.abs(broll.currentTime - wanted) > 1.25) {
-            try { broll.currentTime = wanted; } catch (_) {}
-          }
-        }
-        try {
-          const pad = state.brollMode === 'subtle' ? 8 : 0;
-          ctx.fillStyle = '#020617';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(broll, pad, pad, canvas.width - pad * 2, canvas.height - pad * 2);
-          if (state.brollMode !== 'subtle') {
-            ctx.fillStyle = 'rgba(2,6,23,.68)';
-            ctx.fillRect(0, 142, canvas.width, 50);
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 22px Inter, sans-serif';
-            ctx.fillText('AUTO B-ROLL', 18, 174);
-          }
-        } catch (_) {}
-      } else {
-        const g = ctx.createLinearGradient(0, 0, 500, 192);
-        g.addColorStop(0, '#065f46');
-        g.addColorStop(1, '#0e7490');
-        ctx.fillStyle = g;
-        ctx.fillRect(0, 0, 500, 192);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 22px Inter, sans-serif';
-        ctx.fillText('B-ROLL PREVIEW', 18, 82);
-        ctx.font = '16px Inter, sans-serif';
-        ctx.fillText('Upload a video to use moving cutaways', 18, 118);
-      }
-    }
-
     // =========================================================================
     // 9. ONE-CLICK EXPORT / DOWNLOAD SHORT
     // =========================================================================
@@ -1501,7 +1386,7 @@
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d', { alpha: false });
-      const fps = 30;
+      const fps = 24;
       const canvasStream = canvas.captureStream(fps);
       const tracks = [...canvasStream.getVideoTracks()];
       let sourceStream = null;
@@ -1522,7 +1407,7 @@
         .find(type => MediaRecorder.isTypeSupported(type)) || '';
       let recorder;
       try {
-        recorder = new MediaRecorder(outputStream, mimeType ? { mimeType, videoBitsPerSecond: quality === '4K' ? 18000000 : quality === '2K' ? 12000000 : 8000000 } : undefined);
+          recorder = new MediaRecorder(outputStream, mimeType ? { mimeType, videoBitsPerSecond: quality === '4K' ? 16000000 : quality === '2K' ? 10000000 : 6000000, audioBitsPerSecond: 192000 } : undefined);
       } catch (err) {
         canvasStream.getTracks().forEach(track => track.stop());
         showToast('Could not start video encoder in this browser.');
@@ -1547,8 +1432,6 @@
         showToast(`Short #${idx + 1} video downloaded • ${quality}`);
       };
 
-      const broll = document.getElementById('autoBrollSourceVideo');
-      const brollCanvas = document.getElementById('brollVisualCanvas');
       const drawCover = (source, x, y, w, h) => {
         if (!source || source.readyState < 2) return;
         const sw = source.videoWidth || 1, sh = source.videoHeight || 1;
@@ -1562,27 +1445,6 @@
         ctx.fillRect(0, 0, width, height);
         if (proj.isRealVideo) {
           drawCover(videoEl, 0, 0, width, height);
-          if (state.brollMode !== 'off' && broll && broll.readyState >= 2) {
-            const bw = Math.round(width * (state.brollMode === 'subtle' ? 0.34 : 0.46));
-            const bh = Math.round(bw * 9 / 16);
-            const bx = width - bw - Math.round(width * 0.035);
-            const by = Math.round(height * 0.045);
-            ctx.save();
-            ctx.shadowColor = '#10b981';
-            ctx.shadowBlur = Math.max(8, width * 0.008);
-            ctx.strokeStyle = '#34d399';
-            ctx.lineWidth = Math.max(3, width * 0.003);
-            ctx.beginPath();
-            ctx.roundRect(bx, by, bw, bh, Math.max(12, width * 0.012));
-            ctx.clip();
-            drawCover(broll, bx, by, bw, bh);
-            ctx.restore();
-            ctx.fillStyle = 'rgba(2,6,23,.78)';
-            ctx.fillRect(bx, by + bh - Math.round(height * 0.035), bw, Math.round(height * 0.035));
-            ctx.fillStyle = '#ffffff';
-            ctx.font = `bold ${Math.round(width * 0.018)}px Inter, sans-serif`;
-            ctx.fillText('AUTO B-ROLL', bx + Math.round(width * 0.015), by + bh - Math.round(height * 0.012));
-          }
         } else {
           const grad = ctx.createLinearGradient(0, 0, width, height);
           grad.addColorStop(0, '#070b14'); grad.addColorStop(0.5, '#0f172a'); grad.addColorStop(1, '#064e3b');
@@ -1592,7 +1454,7 @@
           ctx.fillText('MANO CLIP TOOL', width * 0.08, height * 0.45);
         }
 
-        if (state.captionStyle !== 'clean' || true) {
+        {
           const line = clip.lines[0]?.words?.join(' ') || clip.hook || '';
           ctx.textAlign = 'center';
           ctx.fillStyle = 'rgba(0,0,0,.68)';
@@ -1613,10 +1475,15 @@
         cancelAnimationFrame(rafId);
         try { if (recorder.state !== 'inactive') recorder.stop(); } catch (_) {}
       };
+      let lastDrawAt = 0;
+      const frameInterval = 1000 / fps;
       const tick = now => {
         if (stopped) return;
         if (!startAt) startAt = now;
-        drawFrame();
+        if (now - lastDrawAt >= frameInterval) {
+          drawFrame();
+          lastDrawAt = now;
+        }
         const elapsed = (now - startAt) / 1000;
         if (elapsed >= duration) {
           stopExport();
@@ -1639,17 +1506,10 @@
             videoEl.muted = false;
             videoEl.playbackRate = 1;
             await videoEl.play();
-            if (broll && broll.readyState >= 2) {
-              const bDuration = broll.duration || 0;
-              if (bDuration > 1) {
-                try { broll.currentTime = ((clip.startSec || 0) + 8) % bDuration; } catch (_) {}
-              }
-              broll.play().catch(() => {});
-            }
           }
-          recorder.start(250);
+          recorder.start(1000);
           rafId = requestAnimationFrame(tick);
-          showToast('Recording video with B-Roll overlay and source audio...');
+          showToast('Recording short video with original audio...');
         } catch (err) {
           stopExport();
           showToast('Could not play source video for export. Click Play once, then retry.');
