@@ -1463,6 +1463,8 @@
       let rafId = 0;
       let stopped = false;
       let startAt = 0;
+      const sourceStartTime = proj.isRealVideo ? Math.max(0, clip.startSec || 0) : 0;
+      const sourceEndTime = sourceStartTime + duration;
       const stopExport = () => {
         if (stopped) return;
         stopped = true;
@@ -1478,8 +1480,12 @@
           drawFrame();
           lastDrawAt = now;
         }
-        const elapsed = (now - startAt) / 1000;
-        if (elapsed >= duration) {
+        // For uploaded videos, follow the source media clock so the audio and
+        // rendered picture run for exactly the same clip segment.
+        const reachedEnd = proj.isRealVideo
+          ? (videoEl.ended || videoEl.currentTime >= sourceEndTime - 0.06)
+          : ((now - startAt) / 1000 >= duration);
+        if (reachedEnd) {
           stopExport();
           return;
         }
@@ -1490,18 +1496,40 @@
         try {
           if (proj.isRealVideo) {
             videoEl.pause();
-            videoEl.currentTime = Math.min(clip.startSec || 0, Math.max(0, videoEl.duration - 0.1));
-            await new Promise(resolve => {
-              if (Math.abs(videoEl.currentTime - (clip.startSec || 0)) < 0.15) return resolve();
-              const done = () => { videoEl.removeEventListener('seeked', done); resolve(); };
-              videoEl.addEventListener('seeked', done, { once: true });
-              setTimeout(resolve, 2000);
-            });
+            const targetTime = Math.min(sourceStartTime, Math.max(0, videoEl.duration - 0.05));
+            if (videoEl.seeking || Math.abs(videoEl.currentTime - targetTime) > 0.05) {
+              await new Promise((resolve, reject) => {
+                let settled = false;
+                const cleanup = () => {
+                  if (settled) return;
+                  settled = true;
+                  videoEl.removeEventListener('seeked', onSeeked);
+                  clearTimeout(timeoutId);
+                  resolve();
+                };
+                const onSeeked = () => cleanup();
+                videoEl.addEventListener('seeked', onSeeked, { once: true });
+                const timeoutId = setTimeout(() => {
+                  if (videoEl.seeking) {
+                    videoEl.removeEventListener('seeked', onSeeked);
+                    reject(new Error('Source video seek timed out'));
+                  } else {
+                    cleanup();
+                  }
+                }, 8000);
+                videoEl.currentTime = targetTime;
+                if (!videoEl.seeking && Math.abs(videoEl.currentTime - targetTime) <= 0.05) cleanup();
+              });
+            }
             videoEl.muted = false;
             videoEl.playbackRate = 1;
+            // Start recording before playback so the original audio track is
+            // captured from the first frame through the final music/audio.
+            recorder.start(250);
             await videoEl.play();
+          } else {
+            recorder.start(250);
           }
-          recorder.start(1000);
           rafId = requestAnimationFrame(tick);
           showToast('Recording short video with original audio...');
         } catch (err) {
