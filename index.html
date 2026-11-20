@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mano Clip Tool — AI Viral Clipping Studio</title>
+  <link rel="icon" type="image/png" sizes="192x192" href="./mano-logo-192.png" />
+  <link rel="apple-touch-icon" href="./mano-logo-192.png" />
+  <link rel="manifest" href="./manifest.webmanifest" />
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -84,10 +87,8 @@
       <div class="space-y-4">
         <!-- Brand Logo & Title -->
         <div class="flex items-center gap-2.5 px-1 pt-1">
-          <div class="w-8 h-8 rounded-lg emerald-cyan-btn flex items-center justify-center shadow-lg shadow-emerald-500/25">
-            <svg class="w-4 h-4 text-slate-950" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M4 6a2 2 0 012-2h2v16H6a2 2 0 01-2-2V6zm6-2h4v16h-4V4zm6 0h2a2 2 0 012 2v12a2 2 0 01-2 2h-2V4z"/>
-            </svg>
+          <div class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center">
+            <img src="./mano-logo-192.png" alt="Mano Clip Tool Logo" class="w-full h-full object-contain" />
           </div>
           <span class="font-extrabold text-[15px] tracking-tight text-white">Mano Clip Tool</span>
         </div>
@@ -356,8 +357,8 @@
 
             <!-- AI Clipping Progress Overlay -->
             <div id="clippingLoaderOverlay" class="hidden absolute inset-0 bg-[#070b14]/92 backdrop-blur-md z-30 flex flex-col items-center justify-center p-5 text-center space-y-3">
-              <div class="w-12 h-12 rounded-2xl emerald-cyan-btn text-slate-950 flex items-center justify-center text-xl font-black animate-bounce">
-                ⚡
+              <div class="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center animate-bounce">
+                <img src="./mano-logo-192.png" alt="Mano Clip Tool Logo" class="w-full h-full object-contain" />
               </div>
               <div class="space-y-1">
                 <div id="loaderHeadline" class="text-xs font-extrabold text-white">Detecting Viral Hooks...</div>
