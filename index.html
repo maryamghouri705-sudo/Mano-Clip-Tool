@@ -436,15 +436,15 @@
       </section>
 
       <!-- RIGHT COLUMN: Clip & Framing + Extracted Viral Shorts List -->
-      <section class="lg:col-span-4 sapphire-card rounded-2xl p-4 flex flex-col justify-between space-y-4">
-        <div class="space-y-4 overflow-y-auto max-h-[660px] pr-1">
+      <section class="lg:col-span-4 sapphire-card rounded-2xl p-3 flex flex-col justify-between gap-2 max-h-[calc(100vh-150px)] min-h-0">
+        <div class="space-y-3 overflow-y-auto max-h-[calc(100vh-245px)] min-h-0 pr-1">
           <h2 class="text-sm font-extrabold text-white">Clip & Framing</h2>
 
           <!-- Exact 3 Framing Rows from Capture 2 -->
-          <div class="space-y-2.5">
+          <div class="space-y-1.5">
             <div class="flex items-center justify-between gap-2">
               <label class="text-xs font-medium text-slate-300">Aspect ratio</label>
-              <select id="aspectRatioSelect" onchange="showToast('Aspect Ratio: ' + this.value)" class="w-44 px-3 py-2 rounded-xl sapphire-input text-xs font-bold text-white cursor-pointer">
+              <select id="aspectRatioSelect" onchange="showToast('Aspect Ratio: ' + this.value)" class="w-40 px-2 py-1.5 rounded-lg sapphire-input text-[11px] font-bold text-white cursor-pointer">
                 <option value="9:16">9:16 (Shorts / Reels)</option>
                 <option value="1:1">1:1 (Square)</option>
                 <option value="16:9">16:9 (YouTube)</option>
@@ -453,7 +453,7 @@
 
             <div class="flex items-center justify-between gap-2">
               <label class="text-xs font-medium text-slate-300">Subject</label>
-              <select id="subjectTrackSelect" onchange="showToast('Subject Mode: ' + this.value)" class="w-44 px-3 py-2 rounded-xl sapphire-input text-xs font-bold text-emerald-300 cursor-pointer">
+              <select id="subjectTrackSelect" onchange="showToast('Subject Mode: ' + this.value)" class="w-40 px-2 py-1.5 rounded-lg sapphire-input text-[11px] font-bold text-emerald-300 cursor-pointer">
                 <option value="Face Tracking">Face Tracking</option>
                 <option value="Center Crop">Center Crop</option>
                 <option value="Action Focus">Action Focus</option>
@@ -462,7 +462,7 @@
 
             <div class="flex items-center justify-between gap-2">
               <label class="text-xs font-medium text-slate-300">Quality</label>
-              <select id="qualitySelect" onchange="showToast('Render Quality: ' + this.value)" class="w-44 px-3 py-2 rounded-xl sapphire-input text-xs font-bold text-white cursor-pointer">
+              <select id="qualitySelect" onchange="showToast('Render Quality: ' + this.value)" class="w-40 px-2 py-1.5 rounded-lg sapphire-input text-[11px] font-bold text-white cursor-pointer">
                 <option value="1080p">1080p (Full HD)</option>
                 <option value="2K">2K (1440p)</option>
                 <option value="4K">4K Ultra HD</option>
@@ -473,7 +473,7 @@
           </div>
 
           <!-- Extracted Viral Shorts Section -->
-          <div class="pt-3 border-t border-white/10 space-y-2.5">
+          <div class="pt-2 border-t border-white/10 space-y-1.5">
             <div class="flex items-center justify-between">
               <span class="text-xs font-extrabold text-white">Viral Shorts Ready</span>
               <span id="shortsBadgeCount" class="px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 text-[10px] font-bold">3 Clips</span>
@@ -486,7 +486,7 @@
         </div>
 
         <!-- Bottom Download All Button -->
-        <button onclick="downloadAllViralShorts()" class="w-full py-3 px-4 rounded-xl bg-white hover:bg-slate-100 text-slate-950 font-extrabold text-xs transition flex items-center justify-center gap-2 shadow-lg cursor-pointer">
+        <button onclick="downloadAllViralShorts()" class="w-full py-2 px-3 rounded-lg bg-white hover:bg-slate-100 text-slate-950 font-extrabold text-xs transition flex items-center justify-center gap-2 shadow-lg cursor-pointer">
           <span>⬇</span>
           <span>Download All Shorts (Selected Quality)</span>
         </button>
@@ -1500,8 +1500,8 @@
         const dl = shortDownloadState[idx] || { status: 'idle', percent: 0, elapsed: 0, duration: state.clipLengthSec };
         const card = document.createElement('div');
         card.className = selected
-          ? 'p-3 rounded-xl bg-[#13203b] border border-emerald-400/70 space-y-2 transition'
-          : 'p-3 rounded-xl bg-[#080d1a] border border-white/10 hover:border-cyan-400/40 space-y-2 transition';
+          ? 'p-2 rounded-lg bg-[#13203b] border border-emerald-400/70 space-y-1.5 transition'
+          : 'p-2 rounded-lg bg-[#080d1a] border border-white/10 hover:border-cyan-400/40 space-y-1.5 transition';
 
         const statusText = dl.status === 'done' ? '✓ Downloaded'
           : dl.status === 'working' ? (dl.phase || 'Preparing video…')
@@ -1522,7 +1522,7 @@
             <div class="text-[10px] text-cyan-300">✦ ${state.captionStyle.toUpperCase()} Captions</div>
           </div>
           <div class="flex items-center justify-between gap-2">
-            <button onclick="selectViralClip(${idx})" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-[11px] font-bold text-white cursor-pointer">▶ Play</button>
+            <button onclick="selectViralClip(${idx})" class="px-2 py-1 rounded-md bg-white/10 hover:bg-white/15 text-[10px] font-bold text-white cursor-pointer">▶ Play</button>
             <span id="shortStatus-${idx}" class="text-[10px] font-semibold ${statusColor}">${statusText}</span>
             <span id="shortTime-${idx}" class="text-[10px] font-mono text-slate-400">${dl.status === 'working' ? formatTime(dl.elapsed) + ' / ' + formatTime(dl.duration) : dl.status === 'done' ? '100%' : ''}</span>
           </div>
@@ -1542,7 +1542,7 @@
       if (!group) {
         group = document.createElement('div');
         group.id = 'shortDownloadButtons';
-        group.className = 'grid grid-cols-3 gap-2 mt-2';
+        group.className = 'grid grid-cols-3 gap-1.5 mt-1.5';
         container.parentElement.appendChild(group);
       }
       group.innerHTML = proj.clips.map((clip, idx) => {
@@ -1550,7 +1550,7 @@
         const done = dl.status === 'done';
         const busy = dl.status === 'working';
         return `<button type="button" onclick="downloadSingleShort(${idx})" ${busy ? 'disabled' : ''}
-          class="min-w-0 py-2 px-1 rounded-lg ${done ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : busy ? 'bg-slate-700 text-slate-400' : 'emerald-cyan-btn text-slate-950'} text-[10px] font-extrabold cursor-pointer disabled:opacity-70">
+          class="min-w-0 py-1.5 px-1 rounded-md ${done ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : busy ? 'bg-slate-700 text-slate-400' : 'emerald-cyan-btn text-slate-950'} text-[10px] font-extrabold cursor-pointer disabled:opacity-70">
           ${done ? '✓ Short ' + (idx + 1) : busy ? '… Short ' + (idx + 1) : '⬇ Short ' + (idx + 1)}
         </button>`;
       }).join('');
