@@ -1357,9 +1357,16 @@
     }
 
     async function startViralClippingEngine() {
+      const proj=getActiveProject(); if(!proj) return;
+      const previewCheck = document.getElementById('realVideoElement');
+      // Let the user preview the uploaded video first. Analysis starts only
+      // after they pause it with the player control.
+      if (previewCheck && !previewCheck.paused) {
+        showToast('Please pause the video preview first, then press Start Clipping.');
+        return;
+      }
       audioEngine.unlock();
       audioEngine.stopAll();
-      const proj=getActiveProject(); if(!proj) return;
       const overlay=document.getElementById('clippingLoaderOverlay');
       const fill=document.getElementById('loaderProgressFill');
       const head=document.getElementById('loaderHeadline');
