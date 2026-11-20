@@ -1168,31 +1168,11 @@
       }
     }
 
-    // Lightweight browser-only speech analysis. No Python, Ollama, or local server.
-    let manoWhisperPromise = null;
-
-    async function getManoWhisper() {
-      if (!manoWhisperPromise) {
-        manoWhisperPromise = (async () => {
-          const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2');
-          return await pipeline(
-            'automatic-speech-recognition',
-            'onnx-community/whisper-tiny.en',
-            { dtype: 'q8' }
-          );
-        })();
-      }
-      try {
-        return await manoWhisperPromise;
-      } catch (error) {
-        manoWhisperPromise = null;
-        throw error;
-      }
-    }
-
+    // Browser-only speech analysis. Whisper runs in a Web Worker so the UI stays responsive.
     async function transcribeVideoInBrowser(file, onProgress) {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextClass) throw new Error('This browser cannot read the video audio. Please use the latest Chrome or Edge.');
+
       const decodeContext = new AudioContextClass();
       let decoded;
       try {
@@ -1212,20 +1192,44 @@
       const monoAudio = await offline.startRendering();
       const audioData = monoAudio.getChannelData(0);
 
-      onProgress(18, 'Loading compact speech model…', 'The first use downloads a small model into your browser cache');
-      const transcriber = await getManoWhisper();
-      onProgress(38, 'Listening to the full video…', 'Speech is processed in short overlapping sections');
-      const result = await transcriber(audioData, {
-        sampling_rate: sampleRate,
-        chunk_length_s: 30,
-        stride_length_s: 5,
-        return_timestamps: true
+      onProgress(12, 'Preparing audio…', 'Audio is ready; the page remains responsive during AI analysis');
+      return await new Promise((resolve, reject) => {
+        let worker;
+        try {
+          worker = new Worker(new URL('./whisper-worker.js', document.baseURI), { type: 'module' });
+        } catch (error) {
+          reject(new Error('Could not start the background AI worker. Please reload the tool and try again.'));
+          return;
+        }
+
+        const cleanup = () => {
+          if (worker) worker.terminate();
+        };
+        worker.onmessage = (event) => {
+          const data = event.data || {};
+          if (data.type === 'progress') {
+            onProgress(data.percent, data.title, data.detail);
+          } else if (data.type === 'result') {
+            cleanup();
+            resolve({ chunks: data.chunks || [], duration: data.duration || decoded.duration });
+          } else if (data.type === 'error') {
+            cleanup();
+            reject(new Error(data.message || 'The AI model could not analyse this video.'));
+          }
+        };
+        worker.onerror = (event) => {
+          cleanup();
+          reject(new Error(event.message || 'Background AI analysis failed. Check your internet connection and reload the tool.'));
+        };
+
+        const transferableAudio = new Float32Array(audioData);
+        worker.postMessage({
+          type: 'transcribe',
+          audio: transferableAudio.buffer,
+          sampleRate,
+          duration: decoded.duration
+        }, [transferableAudio.buffer]);
       });
-      const chunks = (result && result.chunks) ? result.chunks : [];
-      if (!chunks.length && result && result.text) {
-        chunks.push({ timestamp: [0, decoded.duration], text: result.text });
-      }
-      return { chunks, duration: decoded.duration };
     }
 
     function rankTranscriptMoments(chunks, videoDuration, clipDuration, wantedCount) {
