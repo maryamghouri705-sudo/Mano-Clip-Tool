@@ -989,7 +989,7 @@
         videoEl.muted = audioEngine.isMuted;
         videoEl.volume = audioEngine.volume;
         if (state.isPlaying) {
-          videoEl.play().catch(() => {});
+          if (autoPlay) videoEl.play().catch(() => {}); else videoEl.pause();
         } else {
           videoEl.pause();
         }
@@ -1374,32 +1374,20 @@
         const mode=document.getElementById('clipsModeSelect')?.value||'3';
         const count=mode==='5'?5:3;
         const duration=Math.max(15,Math.min(90,state.clipLengthSec||30));
-        const transcript = await transcribeVideoInBrowser(proj.sourceFile, (percent, title, detail) => {
-          fill.style.width=percent+'%';
-          head.textContent=title;
-          sub.textContent=detail;
-        });
-        fill.style.width='78%';
-        head.textContent='Finding different interesting moments…';
-        sub.textContent='Checking the transcript across the whole video';
-        let moments = rankTranscriptMoments(transcript.chunks, transcript.duration, duration, count);
-        let selectionMethod = 'spoken moments';
-        // Gaming, ASMR and music videos may contain no dialogue. Fall back to
-        // sampling audio loudness, peaks and dynamics instead of stopping with a speech error.
-        if (!moments.length) {
-          head.textContent='Finding satisfying sound moments…';
-          sub.textContent='No clear speech detected — checking the video audio for strong sound activity';
-          const audioStarts = await findHighActivityMoments(proj, count, duration);
-          moments = audioStarts.map((start, idx) => ({
-            start,
-            end: Math.min(transcript.duration, start + duration),
-            score: Math.max(65, 88 - idx * 3),
-            hook: 'Listen to this satisfying gaming moment',
-            reason: 'Selected from audio peaks, loudness and sound dynamics — suitable for gameplay and ASMR without spoken dialogue.',
-            category: 'audio'
-          }));
-          selectionMethod = 'audio activity moments';
-        }
+        // Fast audio-only scan: sample short points across the video instead of
+        // playing the entire five-minute file through speech recognition.
+        head.textContent='Scanning video sound…';
+        sub.textContent='Checking short audio samples for strong gaming and ASMR moments';
+        const audioStarts = await findHighActivityMoments(proj, count, duration);
+        const totalDuration = Number(preview?.duration) || 0;
+        const moments = audioStarts.map((start, idx) => ({
+          start,
+          end: Math.min(totalDuration || start + duration, start + duration),
+          score: Math.max(65, 88 - idx * 3),
+          hook: 'Listen to this satisfying gaming moment',
+          reason: 'Selected from audio peaks, loudness and sound dynamics — suitable for gameplay and ASMR without spoken dialogue.',
+          category: 'audio'
+        }));
         if (!moments.length) throw new Error('No usable audio activity was found. Please check that your video has sound.');
         proj.clips=moments.map((clip,idx)=>({
           id:`browser-ai-${idx+1}`,
@@ -1413,11 +1401,11 @@
         }));
         fill.style.width='100%';
         head.textContent='Your clip moments are ready';
-        sub.textContent=`Scanned the full ${formatTime(transcript.duration)} video · selected ${selectionMethod}`;
+        sub.textContent=`Scanned audio samples across ${formatTime(totalDuration)} · selected sound moments`;
         await new Promise(resolve=>setTimeout(resolve,350));
         overlay.classList.add('hidden');
-        renderTimelineClips(); renderViralShortsPanel(); selectViralClip(0);
-        showToast(`Found ${proj.clips.length} different spoken moments across the full video.`);
+        renderTimelineClips(); renderViralShortsPanel(); selectViralClip(0, false);
+        showToast(`Found ${proj.clips.length} sound-based clip moments.`);
       } catch(err) {
         console.error('Viral clips analysis error:',err);
         overlay.classList.add('hidden');
@@ -1425,7 +1413,7 @@
       }
     }
 
-    function selectViralClip(idx) {
+    function selectViralClip(idx, autoPlay = true) {
       audioEngine.unlock();
       state.selectedClipIdx = idx;
       const proj = getActiveProject();
@@ -1444,7 +1432,7 @@
         audioEngine.lastSpokenLineKey = '';
       }
 
-      state.isPlaying = true;
+      state.isPlaying = autoPlay;
       updatePlaybackIcons();
       renderTimelineClips();
       renderViralShortsPanel();
