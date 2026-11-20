@@ -1382,8 +1382,25 @@
         fill.style.width='78%';
         head.textContent='Finding different interesting moments…';
         sub.textContent='Checking the transcript across the whole video';
-        const moments = rankTranscriptMoments(transcript.chunks, transcript.duration, duration, count);
-        if (!moments.length) throw new Error('No clear speech was found. Please try a video with spoken audio.');
+        let moments = rankTranscriptMoments(transcript.chunks, transcript.duration, duration, count);
+        let selectionMethod = 'spoken moments';
+        // Gaming, ASMR and music videos may contain no dialogue. Fall back to
+        // sampling audio loudness, peaks and dynamics instead of stopping with a speech error.
+        if (!moments.length) {
+          head.textContent='Finding satisfying sound moments…';
+          sub.textContent='No clear speech detected — checking the video audio for strong sound activity';
+          const audioStarts = await findHighActivityMoments(proj, count, duration);
+          moments = audioStarts.map((start, idx) => ({
+            start,
+            end: Math.min(transcript.duration, start + duration),
+            score: Math.max(65, 88 - idx * 3),
+            hook: 'Listen to this satisfying gaming moment',
+            reason: 'Selected from audio peaks, loudness and sound dynamics — suitable for gameplay and ASMR without spoken dialogue.',
+            category: 'audio'
+          }));
+          selectionMethod = 'audio activity moments';
+        }
+        if (!moments.length) throw new Error('No usable audio activity was found. Please check that your video has sound.');
         proj.clips=moments.map((clip,idx)=>({
           id:`browser-ai-${idx+1}`,
           score:clip.score,
@@ -1396,7 +1413,7 @@
         }));
         fill.style.width='100%';
         head.textContent='Your clip moments are ready';
-        sub.textContent=`Scanned the full ${formatTime(transcript.duration)} video · ${transcript.chunks.length} speech sections`;
+        sub.textContent=`Scanned the full ${formatTime(transcript.duration)} video · selected ${selectionMethod}`;
         await new Promise(resolve=>setTimeout(resolve,350));
         overlay.classList.add('hidden');
         renderTimelineClips(); renderViralShortsPanel(); selectViralClip(0);
