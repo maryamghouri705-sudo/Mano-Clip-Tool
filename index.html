@@ -463,6 +463,21 @@
                 <option value="720p">720p Fast</option>
               </select>
             </div>
+            <div class="rounded-xl border border-white/10 bg-slate-950/40 p-3 space-y-2">
+              <div class="flex items-center justify-between gap-2">
+                <label class="text-xs font-medium text-slate-300">Screen Zoom</label>
+                <select id="zoomModeSelect" onchange="updateZoomControls()" class="w-36 px-3 py-2 rounded-xl sapphire-input text-xs font-bold text-white cursor-pointer">
+                  <option value="auto">Auto Zoom</option>
+                  <option value="manual">Manual Zoom</option>
+                </select>
+              </div>
+              <div class="flex items-center justify-between gap-2">
+                <label for="zoomLevelSelect" class="text-xs text-slate-400">Manual zoom</label>
+                <span id="zoomLevelLabel" class="text-xs font-bold text-emerald-300">1.10x</span>
+              </div>
+              <input id="zoomLevelSelect" type="range" min="1" max="1.4" step="0.05" value="1.1" oninput="updateZoomLabel()" class="w-full accent-emerald-400">
+              <p id="zoomHelpText" class="text-[10px] text-slate-500">Auto mode gently zooms to trim black edges. Choose Manual to adjust and preview your framing.</p>
+            </div>
           </div>
 
           <!-- Extracted Viral Shorts Section -->
@@ -1728,6 +1743,23 @@
       box.innerHTML = `<div class="${wrap}">${htmlWords}</div>`;
     }
 
+    function updateZoomLabel() {
+      const slider = document.getElementById('zoomLevelSelect');
+      const label = document.getElementById('zoomLevelLabel');
+      if (slider && label) label.textContent = Number(slider.value).toFixed(2) + 'x';
+    }
+
+    function updateZoomControls() {
+      const mode = document.getElementById('zoomModeSelect')?.value || 'auto';
+      const slider = document.getElementById('zoomLevelSelect');
+      const help = document.getElementById('zoomHelpText');
+      if (slider) slider.disabled = mode !== 'manual';
+      if (help) help.textContent = mode === 'auto'
+        ? 'Auto mode uses a gentle 1.12x zoom to trim black edges.'
+        : 'Adjust the zoom, then download a short to check the framing. Higher zoom crops more from the edges.';
+      updateZoomLabel();
+    }
+
     // =========================================================================
     // 9. ONE-CLICK EXPORT / DOWNLOAD SHORT
     // =========================================================================
@@ -1889,8 +1921,12 @@
             ctx.fillRect(0, 0, width, height);
             if (proj.isRealVideo && source.readyState >= 2) {
               const sw = source.videoWidth || 1, sh = source.videoHeight || 1;
-              const scale = Math.max(width / sw, height / sh);
-              const cw = width / scale, ch = height / scale;
+              const baseScale = Math.max(width / sw, height / sh);
+              const zoomMode = document.getElementById('zoomModeSelect')?.value || 'auto';
+              const manualZoom = Number(document.getElementById('zoomLevelSelect')?.value || 1.1);
+              const zoomFactor = zoomMode === 'manual' ? Math.max(1, Math.min(1.4, manualZoom)) : 1.12;
+              const cw = (width / baseScale) / zoomFactor;
+              const ch = (height / baseScale) / zoomFactor;
               ctx.drawImage(source, (sw - cw) / 2, (sh - ch) / 2, cw, ch, 0, 0, width, height);
             } else if (!proj.isRealVideo) {
               const grad = ctx.createLinearGradient(0, 0, width, height);
