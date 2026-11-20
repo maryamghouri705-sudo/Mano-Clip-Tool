@@ -1407,7 +1407,7 @@
           start,
           end: Math.min(totalDuration || start + duration, start + duration),
           score: Math.max(65, 88 - idx * 3),
-          hook: 'Listen to this satisfying gaming moment',
+          hook: '',
           reason: 'Selected from audio peaks, loudness and sound dynamics — suitable for gameplay and ASMR without spoken dialogue.',
           category: 'audio'
         }));
@@ -1920,14 +1920,16 @@
               ctx.textAlign = 'center';
               ctx.fillText('MANO CLIP TOOL', width / 2, height * 0.45);
             }
-            const line = clip.lines[0]?.words?.join(' ') || clip.hook || '';
-            ctx.textAlign = 'center';
-            ctx.fillStyle = 'rgba(0,0,0,.68)';
-            ctx.fillRect(width * 0.05, height * 0.79, width * 0.9, height * 0.09);
-            ctx.fillStyle = '#fff';
-            ctx.font = `900 ${Math.round(width * 0.045)}px Montserrat, sans-serif`;
-            ctx.fillText(line, width / 2, height * 0.845, width * 0.84);
-            ctx.textAlign = 'left';
+            const line = clip.lines[0]?.words?.join(' ') || '';
+            if (line.trim()) {
+              ctx.textAlign = 'center';
+              ctx.fillStyle = 'rgba(0,0,0,.68)';
+              ctx.fillRect(width * 0.05, height * 0.79, width * 0.9, height * 0.09);
+              ctx.fillStyle = '#fff';
+              ctx.font = `900 ${Math.round(width * 0.045)}px Montserrat, sans-serif`;
+              ctx.fillText(line, width / 2, height * 0.845, width * 0.84);
+              ctx.textAlign = 'left';
+            }
           };
 
           let startedAt = 0;
