@@ -2,17 +2,17 @@
   "name": "Mano Clip Tool",
   "short_name": "Mano Clip Tool",
   "description": "AI Viral Clipping Studio",
-  "start_url": "./?v=2",
+  "start_url": "./?v=3",
   "scope": "./",
   "display": "standalone",
   "background_color": "#070b14",
   "theme_color": "#070b14",
   "icons": [
     {
-      "src": "./mano-icon-192.jpg?v=2",
+      "src": "./mano-logo-192.png?v=3",
       "sizes": "192x192",
-      "type": "image/jpeg",
-      "purpose": "any"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
