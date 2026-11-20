@@ -989,7 +989,11 @@
         videoEl.muted = audioEngine.isMuted;
         videoEl.volume = audioEngine.volume;
         if (state.isPlaying) {
-          if (autoPlay) videoEl.play().catch(() => {}); else videoEl.pause();
+          videoEl.play().catch((err) => {
+            console.warn('Video preview could not start:', err);
+            state.isPlaying = false;
+            updatePlaybackIcons();
+          });
         } else {
           videoEl.pause();
         }
