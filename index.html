@@ -1111,13 +1111,18 @@
         const total=probe.duration;
         if(!Number.isFinite(total)||total<=0) throw new Error('Invalid video duration');
         const maxStart=Math.max(0,total-clipSeconds);
-        const sampleCount=Math.min(24,Math.max(10,Math.ceil(total/90)));
+        const sampleCount=Math.min(12,Math.max(6,Math.ceil(total/180)));
         audioContext=new AC();
         analyser=audioContext.createAnalyser();
         analyser.fftSize=2048;
         source=audioContext.createMediaElementSource(probe);
         source.connect(analyser);
-        analyser.connect(audioContext.destination);
+        // Keep the analyser active through a silent gain node. Never route
+        // the scanned video's sound directly to the computer speakers.
+        const silentOutput=audioContext.createGain();
+        silentOutput.gain.value=0;
+        analyser.connect(silentOutput);
+        silentOutput.connect(audioContext.destination);
         await audioContext.resume();
 
         const samples=[];
@@ -1132,7 +1137,7 @@
           if(playPromise) await playPromise;
           const readings=[];
           const began=performance.now();
-          while(performance.now()-began<1100){
+          while(performance.now()-began<450){
             const data=new Float32Array(analyser.fftSize);
             analyser.getFloatTimeDomainData(data);
             let sum=0,peak=0;
@@ -1353,6 +1358,7 @@
 
     async function startViralClippingEngine() {
       audioEngine.unlock();
+      audioEngine.stopAll();
       const proj=getActiveProject(); if(!proj) return;
       const overlay=document.getElementById('clippingLoaderOverlay');
       const fill=document.getElementById('loaderProgressFill');
@@ -1426,7 +1432,13 @@
         if (videoEl.readyState >= 1) {
           videoEl.currentTime = Math.min(clip.startSec, Math.max(0, videoEl.duration - 2));
         }
-        videoEl.play().catch(() => {});
+        if (autoPlay) {
+          videoEl.muted = audioEngine.isMuted;
+          videoEl.volume = audioEngine.volume;
+          videoEl.play().catch(() => {});
+        } else {
+          videoEl.pause();
+        }
       } else {
         state.sampleClock = 0;
         audioEngine.lastSpokenLineKey = '';
