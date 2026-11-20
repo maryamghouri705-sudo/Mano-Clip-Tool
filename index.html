@@ -738,14 +738,14 @@
     // =========================================================================
     // 3. UI HELPERS & MODALS
     // =========================================================================
-    function showToast(message) {
+    function showToast(message, duration = 2800) {
       const box = document.getElementById('toastBox');
       document.getElementById('toastText').textContent = message;
       box.classList.remove('translate-y-24', 'opacity-0');
       clearTimeout(window._toastTimer);
       window._toastTimer = setTimeout(() => {
         box.classList.add('translate-y-24', 'opacity-0');
-      }, 2800);
+      }, duration);
     }
 
     function openNewProjectModal() {
@@ -1404,7 +1404,7 @@
       } catch(err) {
         console.error('Viral clips analysis error:',err);
         overlay.classList.add('hidden');
-        showToast(err.message || 'Could not analyse this video. Please try again in Chrome or Edge.');
+        showToast(err.message || 'Could not analyse this video. Please try again in Chrome or Edge.', 15000);
       }
     }
 
