@@ -1863,8 +1863,8 @@
           ].find(type => MediaRecorder.isTypeSupported(type)) || '';
           recorder = new MediaRecorder(outputStream, mimeType ? {
             mimeType,
-            videoBitsPerSecond: quality === '4K' ? 16000000 : quality === '2K' ? 10000000 : 6000000,
-            audioBitsPerSecond: 192000
+            videoBitsPerSecond: quality === '4K' ? 10000000 : quality === '2K' ? 7000000 : quality === '720p' ? 2000000 : 4000000,
+            audioBitsPerSecond: 128000
           } : undefined);
 
           recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
