@@ -64,7 +64,7 @@
     ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 9999px; }
   </style>
 </head>
-<body class="min-h-screen flex flex-col antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
+<body class="h-screen min-h-0 overflow-hidden flex flex-col antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
 
   <!-- Hidden File Input for Uploading Video / Opening Folder -->
   <input type="file" id="videoUploadInput" accept="video/mp4,video/webm,video/quicktime,video/*" class="hidden" onchange="handleRealVideoUpload(event)" />
@@ -80,7 +80,7 @@
   <!-- ===================================================================== -->
   <!-- VIEW 1: EXACT SIDEBAR & PROJECTS DASHBOARD (Matching Capture 1)       -->
   <!-- ===================================================================== -->
-  <div id="dashboardView" class="flex-1 flex flex-col md:flex-row min-h-screen">
+  <div id="dashboardView" class="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto">
     
     <!-- Left Fixed Sidebar (260px on Desktop, Exact Capture 1 Structure) -->
     <aside class="w-full md:w-[260px] sapphire-sidebar p-4 flex flex-col justify-between shrink-0">
@@ -199,7 +199,7 @@
   <!-- ===================================================================== -->
   <!-- VIEW 2: EXACT 3-COLUMN STUDIO EDITOR (Matching Capture 2)             -->
   <!-- ===================================================================== -->
-  <div id="studioView" class="hidden flex-1 flex flex-col h-screen min-h-0 overflow-hidden">
+  <div id="studioView" class="hidden flex-1 flex flex-col h-full min-h-0 overflow-hidden">
     
     <!-- Top Bar: < Back | Step Progress Bar | Change Button -->
     <header class="bg-[#0b1120] border-b border-cyan-500/15 px-4 sm:px-6 h-14 min-h-[56px] shrink-0 flex items-center justify-between gap-3 sticky top-0 z-30">
