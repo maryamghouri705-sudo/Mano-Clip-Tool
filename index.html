@@ -208,27 +208,25 @@
         <span>Back</span>
       </button>
 
-      <!-- Centered 4-Step Progress Bar (Select Video -> Viral Clips -> Edit -> Render) -->
-      <div class="hidden md:flex items-center gap-2 text-xs font-semibold">
-        <div class="flex items-center gap-1.5 text-emerald-400">
-          <span class="w-4 h-4 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-[10px] font-black">✓</span>
+      <!-- Four-step workflow progress: each check appears only after its task succeeds -->
+      <div class="hidden md:flex items-center gap-2 text-xs font-semibold" aria-label="Video workflow progress">
+        <div id="stepSelectPill" class="flex items-center gap-1.5 text-slate-500">
+          <span data-step-icon class="w-4 h-4 rounded-full border border-slate-600 flex items-center justify-center text-[10px] font-black"></span>
           <span>Select Video</span>
         </div>
-        <span class="w-6 h-[1px] bg-slate-700"></span>
-        <div id="stepViralPill" class="flex items-center gap-1.5 text-white font-bold">
-          <span class="w-4 h-4 rounded-full border-2 border-cyan-400 flex items-center justify-center">
-            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-          </span>
+        <span id="stepConnector1" class="w-6 h-[1px] bg-slate-700"></span>
+        <div id="stepViralPill" class="flex items-center gap-1.5 text-slate-500">
+          <span data-step-icon class="w-4 h-4 rounded-full border border-slate-600 flex items-center justify-center text-[10px] font-black"></span>
           <span>Viral Clips</span>
         </div>
-        <span class="w-6 h-[1px] bg-slate-700"></span>
+        <span id="stepConnector2" class="w-6 h-[1px] bg-slate-700"></span>
         <div id="stepEditPill" class="flex items-center gap-1.5 text-slate-500">
-          <span class="w-4 h-4 rounded-full border border-slate-600"></span>
+          <span data-step-icon class="w-4 h-4 rounded-full border border-slate-600 flex items-center justify-center text-[10px] font-black"></span>
           <span>Edit</span>
         </div>
-        <span class="w-6 h-[1px] bg-slate-700"></span>
+        <span id="stepConnector3" class="w-6 h-[1px] bg-slate-700"></span>
         <div id="stepRenderPill" class="flex items-center gap-1.5 text-slate-500">
-          <span class="w-4 h-4 rounded-full border border-slate-600"></span>
+          <span data-step-icon class="w-4 h-4 rounded-full border border-slate-600 flex items-center justify-center text-[10px] font-black"></span>
           <span>Render</span>
         </div>
       </div>
@@ -886,6 +884,7 @@
         id: 'proj-' + Date.now(), code: nextCode, title: nextCode,
         subtitle: cleanTitle, duration: 'Auto', aspect: '9:16',
         isRealVideo: true, videoUrl: objectUrl, sourceFile: file,
+        workflow: { video: false, clips: false, edit: false, rendering: false, render: false, renderError: false },
         clips: [
           { id: 'rc-1', score: 0, duration: '0:30', startSec: 0, hook: 'Analysing high-activity moment…', lines: [] },
           { id: 'rc-2', score: 0, duration: '0:30', startSec: 30, hook: 'Analysing high-activity moment…', lines: [] },
@@ -924,6 +923,59 @@
       return state.projects.find(p => p.id === state.activeProjectId) || state.projects[0];
     }
 
+    // Keep the four visible workflow steps tied to successful app actions.
+    function ensureWorkflowState(proj) {
+      if (!proj.workflow) {
+        proj.workflow = {
+          video: !proj.isRealVideo,
+          clips: !proj.isRealVideo && Array.isArray(proj.clips) && proj.clips.length > 0,
+          edit: false,
+          rendering: false,
+          render: false,
+          renderError: false
+        };
+      }
+      return proj.workflow;
+    }
+
+    function updateWorkflowProgress() {
+      const proj = getActiveProject();
+      if (!proj) return;
+      const workflow = ensureWorkflowState(proj);
+      const stages = [
+        { key: 'video', id: 'stepSelectPill', label: 'Select Video' },
+        { key: 'clips', id: 'stepViralPill', label: 'Viral Clips' },
+        { key: 'edit', id: 'stepEditPill', label: 'Edit' },
+        { key: 'render', id: 'stepRenderPill', label: 'Render' }
+      ];
+      stages.forEach((stage, index) => {
+        const pill = document.getElementById(stage.id);
+        if (!pill) return;
+        const done = !!workflow[stage.key];
+        const active = !done && (
+          index === 0 ||
+          (index === 1 && workflow.video) ||
+          (index === 2 && workflow.clips) ||
+          (index === 3 && workflow.edit)
+        );
+        const failed = stage.key === 'render' && !!workflow.renderError;
+        const icon = pill.querySelector('[data-step-icon]');
+        pill.className = 'flex items-center gap-1.5 text-xs font-semibold ' +
+          (done ? 'text-emerald-400' : failed ? 'text-rose-300' : active ? 'text-white font-bold' : 'text-slate-500');
+        if (icon) {
+          icon.className = 'w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black ' +
+            (done ? 'bg-emerald-500 text-slate-950' : failed ? 'bg-rose-500/20 border border-rose-400 text-rose-300' : active ? 'border-2 border-cyan-400' : 'border border-slate-600');
+          icon.textContent = done ? '✓' : failed ? '!' : active ? '•' : '';
+        }
+        pill.title = done ? stage.label + ' completed' : failed ? stage.label + ' failed — retry export' : active ? stage.label + ' in progress' : stage.label + ' waiting';
+      });
+      [1, 2, 3].forEach((number) => {
+        const connector = document.getElementById('stepConnector' + number);
+        if (connector) connector.className = 'w-6 h-[1px] ' +
+          (workflow[stages[number - 1].key] ? 'bg-emerald-500/70' : 'bg-slate-700');
+      });
+    }
+
     function openStudioForProject(projectId, autoRunClipper = false) {
       audioEngine.unlock();
       state.activeProjectId = projectId;
@@ -950,6 +1002,8 @@
         videoEl.onloadedmetadata = () => {
           const total = Math.max(5, Math.floor(videoEl.duration));
           proj.duration = formatTime(total);
+          ensureWorkflowState(proj).video = true;
+          updateWorkflowProgress();
           // Keep the clip positions selected by the analysis engine.
           // Do not reset them to evenly spaced positions when metadata loads.
         };
@@ -969,6 +1023,7 @@
       }
 
       renderViralShortsPanel();
+      updateWorkflowProgress();
       if (autoRunClipper) {
         startViralClippingEngine();
       }
@@ -1429,6 +1484,8 @@
         await new Promise(resolve=>setTimeout(resolve,350));
         overlay.classList.add('hidden');
         renderTimelineClips(); renderViralShortsPanel(); selectViralClip(0, false);
+        ensureWorkflowState(proj).clips = true;
+        updateWorkflowProgress();
         showToast(`Found ${proj.clips.length} sound-based clip moments.`);
       } catch(err) {
         console.error('Viral clips analysis error:',err);
@@ -1783,6 +1840,11 @@
       const estimatedDuration = proj.isRealVideo
         ? Math.max(1, Math.min(state.clipLengthSec || 30, (previewVideo.duration || state.clipLengthSec) - Math.max(0, clip.startSec || 0)))
         : Math.max(1, state.clipLengthSec || 30);
+      const workflow = ensureWorkflowState(proj);
+      workflow.edit = true;
+      workflow.rendering = true;
+      workflow.renderError = false;
+      updateWorkflowProgress();
       updateShortDownloadUI(idx, { status: 'working', phase: 'Preparing video…', percent: 0, elapsed: 0, duration: estimatedDuration });
       showToast(`Preparing Short #${idx + 1} • ${quality}...`);
 
@@ -1813,6 +1875,13 @@
           } else {
             updateShortDownloadUI(idx, { status: 'error', phase: message || 'Export failed', percent: 0 });
           }
+          const workflow = ensureWorkflowState(proj);
+          const allRendered = success && proj.clips.length > 0 &&
+            proj.clips.every((_, clipIndex) => shortDownloadState[clipIndex]?.status === 'done');
+          workflow.render = allRendered;
+          workflow.rendering = false;
+          workflow.renderError = !success;
+          updateWorkflowProgress();
           renderViralShortsPanel();
           if (message) showToast(message);
           resolve(success);
@@ -1994,6 +2063,7 @@
     // Initialize on load
     window.addEventListener('DOMContentLoaded', () => {
       renderProjectsGrid();
+      updateWorkflowProgress();
       requestAnimationFrame(mainStudioLoop);
     });
   </script>
