@@ -246,15 +246,6 @@
       </button>
     </header>
 
-    <!-- Five-stage workflow controls: each stage is confirmed before moving forward. -->
-    <div class="shrink-0 px-3 sm:px-5 py-2 bg-[#080d1a] border-b border-cyan-500/15">
-      <div class="max-w-[1650px] mx-auto flex flex-wrap items-center gap-2">
-        <div id="workflowStageButtons" class="flex flex-1 flex-wrap items-center gap-1.5"></div>
-        <button id="workflowNextBtn" type="button" onclick="advanceWorkflowStage()" class="px-4 py-2 rounded-lg emerald-cyan-btn text-slate-950 text-xs font-black shadow cursor-pointer">Next ›</button>
-      </div>
-      <p id="workflowStageHelp" class="max-w-[1650px] mx-auto mt-1 text-[10px] text-slate-400">Upload a video to begin. Complete each stage, then press Next.</p>
-    </div>
-
     <!-- Main 3-Column Workspace (Left Controls | Center Player & Timeline | Right Framing & Shorts) -->
     <div class="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3.5 p-3.5 max-w-[1650px] w-full mx-auto overflow-hidden">
       
@@ -324,6 +315,14 @@
             <span>Start clipping</span>
             <span>›</span>
           </button>
+        </div>
+
+        <!-- Workflow navigation moved to the left column to free vertical space for Shorts. -->
+        <div class="pt-3 border-t border-cyan-400/20 space-y-2">
+          <div class="text-[10px] font-extrabold tracking-wider text-cyan-300">WORKFLOW STEPS</div>
+          <div id="workflowStageButtons" class="grid grid-cols-2 gap-1.5"></div>
+          <button id="workflowNextBtn" type="button" onclick="advanceWorkflowStage()" class="w-full px-3 py-2 rounded-lg emerald-cyan-btn text-slate-950 text-xs font-black shadow cursor-pointer">Next ›</button>
+          <p id="workflowStageHelp" class="text-[10px] leading-relaxed text-slate-400">Upload a video to begin. Complete each stage, then press Next.</p>
         </div>
       </section>
 
