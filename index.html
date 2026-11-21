@@ -226,9 +226,14 @@
           <span>Edit</span>
         </div>
         <span id="stepConnector3" class="w-6 h-[1px] bg-slate-700"></span>
+        <div id="stepBrollPill" class="flex items-center gap-1.5 text-slate-500">
+          <span data-step-icon class="w-4 h-4 rounded-full border border-slate-600 flex items-center justify-center text-[10px] font-black"></span>
+          <span>B-Roll</span>
+        </div>
+        <span id="stepConnector4" class="w-6 h-[1px] bg-slate-700"></span>
         <div id="stepRenderPill" class="flex items-center gap-1.5 text-slate-500">
           <span data-step-icon class="w-4 h-4 rounded-full border border-slate-600 flex items-center justify-center text-[10px] font-black"></span>
-          <span>Render</span>
+          <span>Rendering</span>
         </div>
       </div>
 
@@ -974,6 +979,7 @@
           video: !proj.isRealVideo,
           clips: !proj.isRealVideo && Array.isArray(proj.clips) && proj.clips.length > 0,
           edit: false,
+          broll: false,
           rendering: false,
           render: false,
           renderError: false
@@ -989,8 +995,9 @@
       const stages = [
         { key: 'video', id: 'stepSelectPill', label: 'Select Video' },
         { key: 'clips', id: 'stepViralPill', label: 'Viral Clips' },
-        { key: 'edit', id: 'stepEditPill', label: 'Edit' },
-        { key: 'render', id: 'stepRenderPill', label: 'Render' }
+        { key: 'edit', id: 'stepEditPill', label: 'Editing' },
+        { key: 'broll', id: 'stepBrollPill', label: 'B-Roll' },
+        { key: 'render', id: 'stepRenderPill', label: 'Rendering' }
       ];
       stages.forEach((stage, index) => {
         const pill = document.getElementById(stage.id);
@@ -1000,7 +1007,8 @@
           index === 0 ||
           (index === 1 && workflow.video) ||
           (index === 2 && workflow.clips) ||
-          (index === 3 && workflow.edit)
+          (index === 3 && workflow.edit) ||
+          (index === 4 && workflow.broll)
         );
         const failed = stage.key === 'render' && !!workflow.renderError;
         const icon = pill.querySelector('[data-step-icon]');
@@ -1013,7 +1021,7 @@
         }
         pill.title = done ? stage.label + ' completed' : failed ? stage.label + ' failed — retry export' : active ? stage.label + ' in progress' : stage.label + ' waiting';
       });
-      [1, 2, 3].forEach((number) => {
+      [1, 2, 3, 4].forEach((number) => {
         const connector = document.getElementById('stepConnector' + number);
         if (connector) connector.className = 'w-6 h-[1px] ' +
           (workflow[stages[number - 1].key] ? 'bg-emerald-500/70' : 'bg-slate-700');
