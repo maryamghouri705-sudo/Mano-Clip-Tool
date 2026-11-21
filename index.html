@@ -1281,11 +1281,11 @@
       showToast(`Clip Length: ${state.clipLengthSec} sec`);
     }
 
-    // Sample audio activity at many positions across the full uploaded video.
-    // This is a lightweight loudness/dynamics heuristic, not semantic AI or a virality guarantee.
+    // Fast audio sampling: inspect only as many points as requested clips.
+    // This is a lightweight loudness heuristic, not semantic AI or a virality guarantee.
     async function findHighActivityMoments(project, count, clipSeconds) {
       const probe = document.createElement('video');
-      probe.preload = 'auto';
+      probe.preload = 'metadata';
       probe.playsInline = true;
       probe.muted = false;
       probe.volume = 1;
@@ -1295,258 +1295,73 @@
 
       let audioContext, analyser, source;
       try {
-        await new Promise((resolve,reject) => {
-          const timer=setTimeout(()=>reject(new Error('Video metadata timeout')),20000);
-          probe.onloadedmetadata=()=>{clearTimeout(timer);resolve();};
-          probe.onerror=()=>{clearTimeout(timer);reject(new Error('Cannot read uploaded video'));};
+        await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('Video metadata timeout')), 12000);
+          probe.onloadedmetadata = () => { clearTimeout(timer); resolve(); };
+          probe.onerror = () => { clearTimeout(timer); reject(new Error('Cannot read uploaded video')); };
           probe.load();
         });
-        const total=probe.duration;
-        if(!Number.isFinite(total)||total<=0) throw new Error('Invalid video duration');
-        const maxStart=Math.max(0,total-clipSeconds);
-        const sampleCount=Math.min(12,Math.max(6,Math.ceil(total/180)));
-        audioContext=new AC();
-        analyser=audioContext.createAnalyser();
-        analyser.fftSize=2048;
-        source=audioContext.createMediaElementSource(probe);
+        const total = probe.duration;
+        if (!Number.isFinite(total) || total <= 0) throw new Error('Invalid video duration');
+        const maxStart = Math.max(0, total - clipSeconds);
+        const sampleCount = Math.min(count, Math.max(1, Math.floor(maxStart / Math.max(clipSeconds, 1)) + 1));
+        audioContext = new AC();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 1024;
+        source = audioContext.createMediaElementSource(probe);
         source.connect(analyser);
-        // Keep the analyser active through a silent gain node. Never route
-        // the scanned video's sound directly to the computer speakers.
-        const silentOutput=audioContext.createGain();
-        silentOutput.gain.value=0;
+        const silentOutput = audioContext.createGain();
+        silentOutput.gain.value = 0;
         analyser.connect(silentOutput);
         silentOutput.connect(audioContext.destination);
         await audioContext.resume();
 
-        const samples=[];
-        for(let i=0;i<sampleCount;i++){
-          const start=maxStart*i/Math.max(1,sampleCount-1);
-          await new Promise((resolve,reject)=>{
-            const timer=setTimeout(()=>reject(new Error('Seek timeout')),12000);
-            probe.onseeked=()=>{clearTimeout(timer);resolve();};
-            probe.currentTime=start;
+        const samples = [];
+        for (let i = 0; i < sampleCount; i++) {
+          const start = sampleCount === 1 ? maxStart / 2 : maxStart * i / (sampleCount - 1);
+          await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('Video seek is taking too long. Please try a smaller video.')), 8000);
+            const done = () => { clearTimeout(timer); resolve(); };
+            probe.addEventListener('seeked', done, { once: true });
+            probe.currentTime = start;
+            if (Math.abs(probe.currentTime - start) < 0.05 && !probe.seeking) done();
           });
-          const playPromise=probe.play();
-          if(playPromise) await playPromise;
-          const readings=[];
-          const began=performance.now();
-          while(performance.now()-began<450){
-            const data=new Float32Array(analyser.fftSize);
+          await probe.play();
+          const data = new Float32Array(analyser.fftSize);
+          const began = performance.now();
+          let sum = 0, peak = 0, readings = 0;
+          while (performance.now() - began < 220) {
             analyser.getFloatTimeDomainData(data);
-            let sum=0,peak=0;
-            for(let j=0;j<data.length;j+=4){const v=data[j];sum+=v*v;peak=Math.max(peak,Math.abs(v));}
-            readings.push({rms:Math.sqrt(sum/Math.max(1,data.length/4)),peak});
-            await new Promise(resolve=>setTimeout(resolve,100));
+            for (let j = 0; j < data.length; j += 4) {
+              const v = data[j];
+              sum += v * v;
+              peak = Math.max(peak, Math.abs(v));
+              readings++;
+            }
+            await new Promise(resolve => setTimeout(resolve, 70));
           }
           probe.pause();
-          const mean=readings.reduce((s,x)=>s+x.rms,0)/Math.max(1,readings.length);
-          const peak=Math.max(0,...readings.map(x=>x.peak));
-          const variation=readings.length>1
-            ? Math.sqrt(readings.reduce((s,x)=>s+(x.rms-mean)**2,0)/readings.length) : 0;
-          samples.push({start,score:mean*.5+peak*.25+variation*.25});
+          const rms = Math.sqrt(sum / Math.max(1, readings));
+          samples.push({ start, score: rms * 0.65 + peak * 0.35 });
         }
-        samples.sort((x,y)=>y.score-x.score);
-        const chosen=[];
-        for(const item of samples){
-          if(chosen.every(x=>Math.abs(x.start-item.start)>=clipSeconds*.75)) chosen.push(item);
-          if(chosen.length===count) break;
+        samples.sort((a, b) => b.score - a.score);
+        const chosen = [];
+        for (const item of samples) {
+          if (chosen.every(x => Math.abs(x.start - item.start) >= clipSeconds * 0.75)) chosen.push(item);
+          if (chosen.length === count) break;
         }
-        if(!chosen.length) throw new Error('No audio activity could be measured');
-        while(chosen.length<count){
-          const fallback=maxStart*chosen.length/Math.max(1,count-1);
-          if(chosen.every(x=>Math.abs(x.start-fallback)>=clipSeconds*.5)) chosen.push({start:fallback,score:0});
+        while (chosen.length < count) {
+          const fallback = maxStart * chosen.length / Math.max(1, count - 1);
+          if (chosen.every(x => Math.abs(x.start - fallback) >= clipSeconds * 0.5)) chosen.push({ start: fallback, score: 0 });
           else break;
         }
-        return chosen.sort((x,y)=>x.start-y.start).map(x=>x.start);
+        return chosen.sort((a, b) => a.start - b.start).map(x => x.start);
       } finally {
         probe.pause();
         probe.removeAttribute('src');
         probe.load();
-        if(audioContext && audioContext.state!=='closed') await audioContext.close();
+        if (audioContext && audioContext.state !== 'closed') await audioContext.close();
       }
-    }
-
-    // Extract the audio track from the uploaded VIDEO by playing it through
-    // the browser media decoder. MP4/WebM container bytes cannot be passed
-    // directly to decodeAudioData().
-    async function transcribeVideoInBrowser(file, onProgress) {
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContextClass) throw new Error('Audio analysis needs the latest Chrome or Edge.');
-
-      const video = document.createElement('video');
-      const objectUrl = URL.createObjectURL(file);
-      video.preload = 'auto';
-      video.muted = false;
-      video.volume = 1;
-      video.playsInline = true;
-      video.src = objectUrl;
-
-      let audioContext = null;
-      let mediaStream = null;
-      let sourceNode = null;
-      let processor = null;
-      let silentGain = null;
-      const audioBlocks = [];
-      let totalSamples = 0;
-      let settled = false;
-
-      try {
-        onProgress(5, 'Opening your MP4 video…', 'Reading the video and its built-in audio track');
-        await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('The video took too long to open. Please try again.')), 30000);
-          video.addEventListener('loadedmetadata', () => { clearTimeout(timeout); resolve(); }, { once: true });
-          video.addEventListener('error', () => { clearTimeout(timeout); reject(new Error('Chrome could not read this video file. Please try another MP4.')); }, { once: true });
-          video.load();
-        });
-
-        const capture = video.captureStream || video.mozCaptureStream;
-        if (!capture) throw new Error('This Chrome version cannot read the video audio track. Please update Chrome.');
-        mediaStream = capture.call(video);
-        if (!mediaStream.getAudioTracks().length) {
-          throw new Error('This MP4 has no readable audio track. Please check that the video contains sound.');
-        }
-
-        audioContext = new AudioContextClass();
-        await audioContext.resume();
-        sourceNode = audioContext.createMediaStreamSource(mediaStream);
-        processor = audioContext.createScriptProcessor(4096, 1, 1);
-        silentGain = audioContext.createGain();
-        silentGain.gain.value = 0;
-        processor.onaudioprocess = event => {
-          if (settled) return;
-          const block = new Float32Array(event.inputBuffer.getChannelData(0));
-          audioBlocks.push(block);
-          totalSamples += block.length;
-          const pct = video.duration ? Math.min(32, 7 + Math.round(video.currentTime / video.duration * 25)) : 10;
-          onProgress(pct, 'Reading audio from your video…', 'Keeping the page responsive while the video is decoded');
-        };
-        sourceNode.connect(processor);
-        processor.connect(silentGain);
-        silentGain.connect(audioContext.destination);
-
-        await video.play();
-        await new Promise((resolve, reject) => {
-          video.addEventListener('ended', resolve, { once: true });
-          video.addEventListener('error', () => reject(new Error('The video stopped while its audio was being read.')), { once: true });
-        });
-        settled = true;
-
-        if (!totalSamples) throw new Error('No audio could be read from this video.');
-        onProgress(35, 'Preparing audio for AI…', 'Converting the video audio into a compact speech format');
-
-        const joined = new Float32Array(totalSamples);
-        let offset = 0;
-        for (const block of audioBlocks) { joined.set(block, offset); offset += block.length; }
-        const targetRate = 16000;
-        const sourceRate = audioContext.sampleRate;
-        const targetLength = Math.floor(joined.length * targetRate / sourceRate);
-        const audio16k = new Float32Array(targetLength);
-        const ratio = sourceRate / targetRate;
-        for (let i = 0; i < targetLength; i++) {
-          const pos = i * ratio;
-          const left = Math.floor(pos);
-          const right = Math.min(left + 1, joined.length - 1);
-          const frac = pos - left;
-          audio16k[i] = joined[left] * (1 - frac) + joined[right] * frac;
-        }
-
-        onProgress(38, 'Loading compact speech model…', 'The AI model may download the first time you use it');
-        return await new Promise((resolve, reject) => {
-          let worker;
-          try {
-            worker = new Worker(new URL('./whisper-worker.js', document.baseURI), { type: 'module' });
-          } catch (error) {
-            reject(new Error('Could not start the background AI worker. Please reload the tool and try again.'));
-            return;
-          }
-          const cleanup = () => { if (worker) worker.terminate(); };
-          worker.onmessage = event => {
-            const data = event.data || {};
-            if (data.type === 'progress') onProgress(data.percent, data.title, data.detail);
-            else if (data.type === 'result') {
-              cleanup();
-              resolve({ chunks: data.chunks || [], duration: video.duration || file.size });
-            } else if (data.type === 'error') {
-              cleanup();
-              reject(new Error(data.message || 'The AI model could not analyse this video.'));
-            }
-          };
-          worker.onerror = event => {
-            cleanup();
-            reject(new Error(event.message || 'Background AI analysis failed. Check your internet connection and reload the tool.'));
-          };
-          worker.postMessage({
-            type: 'transcribe',
-            audio: audio16k.buffer,
-            sampleRate: targetRate,
-            duration: video.duration || 0
-          }, [audio16k.buffer]);
-        });
-      } finally {
-        settled = true;
-        try { video.pause(); } catch (_) {}
-        if (processor) { processor.onaudioprocess = null; processor.disconnect(); }
-        if (sourceNode) sourceNode.disconnect();
-        if (silentGain) silentGain.disconnect();
-        if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
-        if (audioContext && audioContext.state !== 'closed') await audioContext.close().catch(() => {});
-        video.removeAttribute('src');
-        video.load();
-        URL.revokeObjectURL(objectUrl);
-      }
-    }
-
-    function rankTranscriptMoments(chunks, videoDuration, clipDuration, wantedCount) {
-      const windows = [];
-      const step = Math.max(8, Math.round(clipDuration * 0.45));
-      const span = Math.min(clipDuration, Math.max(15, videoDuration));
-      const signals = [
-        /\\b(never|secret|truth|shocking|surprised|mistake|wrong|right|worst|best|changed|real reason|finally|actually)\\b/gi,
-        /\\b(because|but|however|although|instead|turns out|the problem|the reason)\\b/gi,
-        /\\b(fear|afraid|love|hate|angry|cry|regret|heart|family|money|life|death|fail|success)\\b/gi,
-        /[?!]/g
-      ];
-      for (let start = 0; start + 3 < videoDuration; start += step) {
-        const end = Math.min(videoDuration, start + span);
-        const text = chunks
-          .filter(item => {
-            const ts = item.timestamp || [0, 0];
-            return Number(ts[1] ?? 0) > start && Number(ts[0] ?? 0) < end;
-          })
-          .map(item => item.text || '')
-          .join(' ')
-          .replace(/\\s+/g, ' ')
-          .trim();
-        if (text.split(/\\s+/).length < 18) continue;
-        const words = text.split(/\\s+/).length;
-        const hits = signals.reduce((sum, re) => sum + (text.match(re) || []).length, 0);
-        const personal = (text.match(/\\b(I|we|my|our|you)\\b/gi) || []).length;
-        const score = Math.min(98, Math.round(
-          28 + Math.min(words, 115) * 0.18 + Math.min(hits, 9) * 4.2 +
-          Math.min(personal, 12) * 1.1
-        ));
-        const clean = text.replace(/^[,.;:!?\\s]+/, '');
-        const hook = clean.length > 78 ? clean.slice(0, 75).replace(/\\s+\\S*$/, '') + '…' : clean;
-        windows.push({
-          start: Math.max(0, start),
-          end,
-          score,
-          hook: hook || 'Interesting spoken moment',
-          reason: 'Selected from the full-video transcript using speech density, emphasis, and story-related language.',
-          category: hits >= 5 ? 'story' : 'opinion'
-        });
-      }
-
-      windows.sort((a, b) => b.score - a.score);
-      const chosen = [];
-      for (const item of windows) {
-        if (chosen.every(x => Math.abs(x.start - item.start) >= Math.max(18, clipDuration * 0.85))) {
-          chosen.push(item);
-        }
-        if (chosen.length >= wantedCount) break;
-      }
-      chosen.sort((a, b) => a.start - b.start);
-      return chosen;
     }
 
     async function startViralClippingEngine() {
