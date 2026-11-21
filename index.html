@@ -246,6 +246,15 @@
       </button>
     </header>
 
+    <!-- Five-stage workflow controls: each stage is confirmed before moving forward. -->
+    <div class="shrink-0 px-3 sm:px-5 py-2 bg-[#080d1a] border-b border-cyan-500/15">
+      <div class="max-w-[1650px] mx-auto flex flex-wrap items-center gap-2">
+        <div id="workflowStageButtons" class="flex flex-1 flex-wrap items-center gap-1.5"></div>
+        <button id="workflowNextBtn" type="button" onclick="advanceWorkflowStage()" class="px-4 py-2 rounded-lg emerald-cyan-btn text-slate-950 text-xs font-black shadow cursor-pointer">Next ›</button>
+      </div>
+      <p id="workflowStageHelp" class="max-w-[1650px] mx-auto mt-1 text-[10px] text-slate-400">Upload a video to begin. Complete each stage, then press Next.</p>
+    </div>
+
     <!-- Main 3-Column Workspace (Left Controls | Center Player & Timeline | Right Framing & Shorts) -->
     <div class="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3.5 p-3.5 max-w-[1650px] w-full mx-auto overflow-hidden">
       
@@ -926,9 +935,8 @@
       if (!p) return;
       p.brollEnabled = !!on && !!p.isRealVideo;
       const workflow = ensureWorkflowState(p);
-      // B-Roll is an optional stage: ON means it will be applied during export;
-      // OFF means the user has deliberately skipped this stage.
-      workflow.broll = true;
+      // Selecting ON/OFF does not complete this stage; the user confirms with Next.
+      workflow.broll = false;
       workflow.render = false;
       workflow.renderError = false;
       updateBrollStatus();
@@ -985,14 +993,70 @@
         proj.workflow = {
           video: !proj.isRealVideo,
           clips: !proj.isRealVideo && Array.isArray(proj.clips) && proj.clips.length > 0,
-          edit: false,
-          broll: false,
-          rendering: false,
-          render: false,
-          renderError: false
+          edit: false, broll: false, rendering: false, render: false, renderError: false, stage: 0
         };
       }
+      if (typeof proj.workflow.stage !== 'number') proj.workflow.stage = 0;
       return proj.workflow;
+    }
+
+    function renderWorkflowNav() {
+      const proj = getActiveProject(); if (!proj) return;
+      const w = ensureWorkflowState(proj);
+      const keys = ['video','clips','edit','broll','render'];
+      const names = ['1 · Select Video','2 · Viral Clips','3 · Editing','4 · B-Roll','5 · Rendering'];
+      const host = document.getElementById('workflowStageButtons');
+      const next = document.getElementById('workflowNextBtn');
+      const help = document.getElementById('workflowStageHelp');
+      if (!host || !next || !help) return;
+      const unlocked = [true, !!w.video, !!w.clips, !!w.edit, !!w.broll];
+      host.innerHTML = names.map((name,i) => {
+        const done = !!w[keys[i]], active = w.stage === i, disabled = !unlocked[i];
+        return '<button type="button" onclick="goWorkflowStage('+i+')" '+(disabled?'disabled':'')+
+          ' class="px-2.5 py-2 rounded-lg border text-[10px] sm:text-xs font-extrabold transition '+
+          (done?'bg-emerald-500/15 border-emerald-400/50 text-emerald-300':active?'bg-cyan-500/15 border-cyan-400/60 text-white':'bg-slate-800/70 border-slate-700 text-slate-400')+
+          (disabled?' opacity-40 cursor-not-allowed':' cursor-pointer hover:border-cyan-300')+'">'+(done?'✓ ':'')+name+'</button>';
+      }).join('');
+      const messages = [
+        w.video ? 'Video uploaded ✓ Press Next to start Viral Clips.' : 'Step 1: Upload your video. The app will show ✓ when it is ready.',
+        w.clips ? 'Viral clips are ready ✓ Press Next to move to Editing.' : 'Step 2: Choose your clip settings and press Start Clipping. Wait for the ready confirmation.',
+        w.edit ? 'Editing confirmed ✓ Press Next to move to B-Roll.' : 'Step 3: Adjust captions, framing, quality and other editing controls. When finished, press Next to confirm Editing.',
+        w.broll ? 'B-Roll stage confirmed ✓ Press Next to move to Rendering.' : 'Step 4: Turn B-Roll ON or leave it OFF to skip. Then press Next to confirm this stage.',
+        w.render ? 'Rendering complete ✓ Your Shorts have been exported.' : 'Step 5: Press Start Rendering to export your Shorts.'
+      ];
+      help.textContent = messages[w.stage] || messages[0];
+      next.textContent = w.stage === 4 ? (w.render ? '✓ Rendered' : 'Start Rendering ›') : 'Next: '+['Select Video','Viral Clips','Editing','B-Roll','Rendering'][w.stage+1]+' ›';
+      next.disabled = (w.stage===0 && !w.video) || (w.stage===1 && !w.clips) || (w.stage===4 && !!w.render) || (w.stage===4 && !!w.rendering);
+      next.classList.toggle('opacity-40',next.disabled); next.classList.toggle('cursor-not-allowed',next.disabled);
+    }
+
+    function goWorkflowStage(index) {
+      const p=getActiveProject(); if(!p) return;
+      const w=ensureWorkflowState(p);
+      const unlocked=[true,!!w.video,!!w.clips,!!w.edit,!!w.broll];
+      if(!unlocked[index]) { showToast('Please complete the previous stage first.'); return; }
+      w.stage=index; updateWorkflowProgress();
+    }
+
+    function advanceWorkflowStage() {
+      const p=getActiveProject(); if(!p) return;
+      const w=ensureWorkflowState(p);
+      if(w.stage===0) {
+        if(!w.video) { showToast('Please upload and wait for the video-ready check.'); return; }
+        w.stage=1;
+      } else if(w.stage===1) {
+        if(!w.clips) { showToast('Please run Start Clipping and wait for Viral Clips ✓.'); return; }
+        w.stage=2;
+      } else if(w.stage===2) {
+        w.edit=true; w.stage=3; showToast('Editing confirmed ✓');
+      } else if(w.stage===3) {
+        w.broll=true; w.stage=4; showToast(p.brollEnabled?'B-Roll selected ✓':'B-Roll skipped ✓');
+      } else {
+        if(w.render) return;
+        showToast('Rendering started. Please wait for the download confirmation.');
+        downloadAllViralShorts(); return;
+      }
+      updateWorkflowProgress();
     }
 
     function updateWorkflowProgress() {
@@ -1033,6 +1097,7 @@
         if (connector) connector.className = 'w-6 h-[1px] ' +
           (workflow[stages[number - 1].key] ? 'bg-emerald-500/70' : 'bg-slate-700');
       });
+      renderWorkflowNav();
     }
 
     function openStudioForProject(projectId, autoRunClipper = false) {
@@ -1979,10 +2044,7 @@
         ? Math.max(1, Math.min(state.clipLengthSec || 30, (previewVideo.duration || state.clipLengthSec) - Math.max(0, clip.startSec || 0)))
         : Math.max(1, state.clipLengthSec || 30);
       const workflow = ensureWorkflowState(proj);
-      workflow.edit = true;
-      // If the user did not touch the optional B-Roll switch, record it as skipped
-      // so Rendering remains the final stage rather than blocking the export.
-      workflow.broll = true;
+      // Do not auto-mark Editing or B-Roll complete when export begins.
       workflow.rendering = true;
       workflow.renderError = false;
       updateWorkflowProgress();
