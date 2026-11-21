@@ -366,13 +366,6 @@
                     </div>
         </div>
 
-        <!-- Workflow navigation moved to the left column to free vertical space for Shorts. -->
-        <div class="pt-3 border-t border-cyan-400/20 space-y-2">
-          <div class="text-[10px] font-extrabold tracking-wider text-cyan-300">WORKFLOW STEPS</div>
-          <div id="workflowStageButtons" class="grid grid-cols-2 gap-1.5"></div>
-          <button id="workflowNextBtn" type="button" onclick="advanceWorkflowStage()" class="w-full px-3 py-2 rounded-lg emerald-cyan-btn text-slate-950 text-xs font-black shadow cursor-pointer">Next ›</button>
-          <p id="workflowStageHelp" class="text-[10px] leading-relaxed text-slate-400">Upload a video to begin. Complete each stage, then press Next.</p>
-        </div>
       </section>
 
       <!-- CENTER COLUMN: 9:16 Player + Full Working Audio Bar + Timeline -->
@@ -498,6 +491,15 @@
 
       <!-- RIGHT COLUMN: Clip & Framing + Extracted Viral Shorts List -->
       <section class="lg:col-span-4 sapphire-card rounded-2xl p-3 flex flex-col gap-2 h-full max-h-full min-h-0 overflow-hidden">
+                <!-- Workflow navigation moved to the right panel as requested. -->
+                <div class="shrink-0 rounded-xl border border-cyan-400/25 bg-[#080d1a] p-2.5 space-y-2">
+                  <div class="text-[10px] font-extrabold tracking-wider text-cyan-300">WORKFLOW STEPS</div>
+                  <div id="workflowStageButtons" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-1.5"></div>
+                  <button id="workflowNextBtn" type="button" onclick="advanceWorkflowStage()" class="w-full px-3 py-2 rounded-lg emerald-cyan-btn text-slate-950 text-xs font-black shadow cursor-pointer">Next ›</button>
+                  <p id="workflowStageHelp" class="text-[10px] leading-relaxed text-slate-300">Upload a video to begin. Complete each stage, then press Next.</p>
+                </div>
+        
+
         <div class="flex-1 min-h-0 space-y-3 overflow-y-auto pr-1">
 <!-- Extracted Viral Shorts Section -->
           <div class="pt-2 border-t border-white/10 space-y-1.5">
