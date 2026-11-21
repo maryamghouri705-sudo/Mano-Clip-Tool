@@ -204,10 +204,6 @@
     
     <!-- Top Bar: < Back | Step Progress Bar | Change Button -->
     <header class="bg-[#0b1120] border-b border-cyan-500/15 px-4 sm:px-6 h-14 min-h-[56px] shrink-0 flex items-center justify-between gap-3 sticky top-0 z-30">
-      <button onclick="backToProjects()" class="px-3 py-1.5 rounded-lg hover:bg-white/5 text-xs font-bold text-slate-300 hover:text-white flex items-center gap-1.5 transition cursor-pointer">
-        <span>‹</span>
-        <span>Back</span>
-      </button>
 
       <!-- Four-step workflow progress: each check appears only after its task succeeds -->
       <div class="hidden md:flex items-center gap-2 text-xs font-semibold" aria-label="Video workflow progress">
@@ -306,16 +302,7 @@
           </p>
         </div>
 
-        <!-- Bottom Navigation Row: < Back | Start clipping > -->
-        <div class="pt-3 mb-2 border-t border-white/10 flex items-center justify-between gap-2">
-          <button onclick="backToProjects()" class="px-3 py-2.5 rounded-xl hover:bg-white/5 text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer">
-            ‹ Back
-          </button>
-          <button id="startClippingBtn" onclick="startViralClippingEngine()" class="flex-1 py-2.5 px-4 rounded-xl emerald-cyan-btn text-slate-950 font-black text-xs tracking-wide transition transform active:scale-95 flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/25 cursor-pointer">
-            <span>Start clipping</span>
-            <span>›</span>
-          </button>
-        </div>
+
 
         <!-- Clip & Framing + B-Roll controls are now on the left side. -->
         <div class="pt-3 border-t border-cyan-400/20 space-y-3">
@@ -364,6 +351,17 @@
                       <p id="brollStatus" class="text-[11px] font-semibold text-slate-300">OFF · Standard Shorts</p>
                       <p class="text-[10px] text-slate-400">No second upload. Original video audio stays unchanged.</p>
                     </div>
+        </div>
+
+        <!-- Bottom Navigation Row: Back and Start Clipping (at bottom) -->
+        <div class="pt-3 mb-2 border-t border-white/10 flex items-center justify-between gap-2">
+          <button onclick="backToProjects()" class="px-3 py-2.5 rounded-xl hover:bg-white/5 text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer">
+            ‹ Back
+          </button>
+          <button id="startClippingBtn" onclick="startViralClippingEngine()" class="flex-1 py-2.5 px-4 rounded-xl emerald-cyan-btn text-slate-950 font-black text-xs tracking-wide transition transform active:scale-95 flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/25 cursor-pointer">
+            <span>Start clipping</span>
+            <span>›</span>
+          </button>
         </div>
 
       </section>
