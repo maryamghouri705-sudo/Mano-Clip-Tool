@@ -925,9 +925,16 @@
       const p = getActiveProject();
       if (!p) return;
       p.brollEnabled = !!on && !!p.isRealVideo;
+      const workflow = ensureWorkflowState(p);
+      // B-Roll is an optional stage: ON means it will be applied during export;
+      // OFF means the user has deliberately skipped this stage.
+      workflow.broll = true;
+      workflow.render = false;
+      workflow.renderError = false;
       updateBrollStatus();
-      if (p.brollEnabled) showToast('B-Roll effect ON for this uploaded video.');
-      else showToast('B-Roll effect OFF.');
+      updateWorkflowProgress();
+      if (p.brollEnabled) showToast('B-Roll ready ✓ It will be applied during video export.');
+      else showToast('B-Roll skipped ✓ Standard video export selected.');
     }
     function updateBrollStatus() {
       const p = getActiveProject();
@@ -935,14 +942,14 @@
       const status = document.getElementById('brollStatus');
       if (toggle) {
         toggle.disabled = !p?.isRealVideo;
-        toggle.textContent = p?.brollEnabled && p?.isRealVideo ? 'ON' : 'OFF';
+        toggle.textContent = p?.brollEnabled && p?.isRealVideo ? 'ON ✓' : 'OFF';
         toggle.className = p?.brollEnabled && p?.isRealVideo
           ? 'px-4 py-2 rounded-lg emerald-cyan-btn text-slate-950 text-xs font-extrabold shadow cursor-pointer'
           : 'px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-extrabold shadow cursor-pointer';
       }
       if (status) status.textContent = !p?.isRealVideo
         ? 'Upload a source video to enable this effect.'
-        : (p.brollEnabled ? 'ON · Same-video cutaways will be added' : 'OFF · Standard Shorts');
+        : (p.brollEnabled ? '✓ B-ROLL READY · Same-video cutaways will be added during export' : '✓ B-ROLL SKIPPED · Standard Shorts selected');
     }
 
 
@@ -1973,6 +1980,9 @@
         : Math.max(1, state.clipLengthSec || 30);
       const workflow = ensureWorkflowState(proj);
       workflow.edit = true;
+      // If the user did not touch the optional B-Roll switch, record it as skipped
+      // so Rendering remains the final stage rather than blocking the export.
+      workflow.broll = true;
       workflow.rendering = true;
       workflow.renderError = false;
       updateWorkflowProgress();
