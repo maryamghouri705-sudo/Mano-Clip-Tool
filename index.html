@@ -1581,55 +1581,23 @@
         const count=mode==='5'?5:3;
         const duration=Math.max(15,Math.min(90,state.clipLengthSec||30));
         const totalDuration = Number(preview?.duration) || 0;
-        let transcriptChunks = [];
-        let moments = [];
-        try {
-          head.textContent='Listening to the full video…';
-          sub.textContent='Transcribing speech and aligning words with the video timeline';
-          const transcript = await transcribeVideoInBrowser(proj.sourceFile, (percent, title, detail) => {
-            fill.style.width = Math.max(8, Math.min(92, Number(percent) || 8)) + '%';
-            head.textContent = title || 'Analysing speech…';
-            sub.textContent = detail || 'Finding useful moments';
-          });
-          transcriptChunks = Array.isArray(transcript?.chunks) ? transcript.chunks : [];
-          if (transcriptChunks.length) moments = rankTranscriptMoments(transcriptChunks, totalDuration, duration, count);
-        } catch (speechError) {
-          console.warn('Speech transcription unavailable; switching to sound analysis:', speechError);
-          head.textContent='Speech scan unavailable — checking sound…';
-          sub.textContent='Using audio activity analysis as a fallback';
-        }
-        if (!moments.length) {
-          head.textContent='Scanning video sound…';
-          sub.textContent='Finding high-activity audio moments (no speech captions will be invented)';
-          const audioStarts = await findHighActivityMoments(proj, count, duration);
-          moments = audioStarts.map((start, idx) => ({
-            start, end: Math.min(totalDuration || start + duration, start + duration),
-            score: Math.max(65, 88 - idx * 3), hook: 'Sound moment ' + (idx + 1),
-            reason: 'Selected from audio peaks, loudness and sound dynamics.',
-            category: 'audio', lines: []
-          }));
-        }
-        if (!moments.length) throw new Error('No usable speech or audio moments were found. Please check the video sound.');
-        proj.clips=moments.map((clip,idx)=>{
-          const startSec = Math.max(0, Number(clip.start) || 0);
-          const endSec = Math.min(totalDuration || startSec + duration, Number(clip.end) || startSec + duration);
-          const lines = transcriptChunks.filter(item => {
-            const ts = item.timestamp || [0, 0];
-            return Number(ts[1] ?? 0) > startSec && Number(ts[0] ?? 0) < endSec;
-          }).map(item => {
-            const ts = item.timestamp || [startSec, endSec];
-            const lineStart = Math.max(startSec, Number(ts[0]) || startSec);
-            const lineEnd = Math.min(endSec, Number(ts[1]) || endSec);
-            const words = String(item.text || '').trim().split(/\\s+/).filter(Boolean);
-            return words.length ? { startSec: lineStart, endSec: Math.max(lineStart + 0.15, lineEnd), words, hi: Math.max(0, words.length - 1) } : null;
-          }).filter(Boolean);
-          return {
-            id:`browser-ai-${idx+1}`, score:clip.score,
-            duration:formatTime(Math.max(1, endSec - startSec)), startSec, endSec,
-            hook:clip.hook || (lines[0]?.words?.join(' ') || 'Sound moment ' + (idx + 1)),
-            reason:clip.reason, category:clip.category, lines
-          };
-        });
+        head.textContent='Quickly scanning video sound…';
+        sub.textContent='Checking short audio samples for strong moments';
+        const audioStarts = await findHighActivityMoments(proj, count, duration);
+        const moments = audioStarts.map((start, idx) => ({
+          start, end: Math.min(totalDuration || start + duration, start + duration),
+          score: Math.max(65, 88 - idx * 3),
+          hook: 'Sound moment ' + (idx + 1),
+          reason: 'Selected from audio peaks, loudness and sound dynamics.',
+          category: 'audio'
+        }));
+        if (!moments.length) throw new Error('No usable audio activity was found. Please check that your video has sound.');
+        proj.clips=moments.map((clip,idx)=>({
+          id:`browser-ai-${idx+1}`, score:clip.score,
+          duration:formatTime(Math.max(1, clip.end - clip.start)),
+          startSec:clip.start, endSec:clip.end,
+          hook:clip.hook, reason:clip.reason, category:clip.category, lines:[]
+        }));
         fill.style.width='100%';
         head.textContent='Your clip moments are ready';
         sub.textContent=`Scanned audio samples across ${formatTime(totalDuration)} · selected sound moments`;
