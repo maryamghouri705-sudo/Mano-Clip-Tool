@@ -334,7 +334,7 @@
           </div>
 
           <!-- 9:16 Vertical Video Frame -->
-          <div class="relative w-auto max-w-full aspect-[9/16] rounded-2xl overflow-hidden bg-black border border-cyan-400/30 shadow-2xl flex items-center justify-center group shrink-0" style="height: min(40vh, 340px); max-height: 340px;">
+          <div class="relative w-auto max-w-full aspect-[9/16] rounded-2xl overflow-hidden bg-black border border-cyan-400/30 shadow-2xl flex items-center justify-center group shrink-0" id="previewFrame" style="height: min(40vh, 340px); max-height: 340px; aspect-ratio: 9 / 16;">
             
             <!-- Real HTML5 Video Element (Full Unmuted Audio) -->
             <video id="realVideoElement" class="w-full h-full object-cover hidden" playsinline></video>
@@ -411,7 +411,7 @@
             <span class="text-xs font-extrabold text-white">Timeline</span>
             <div class="flex items-center gap-2 text-slate-400 text-xs">
               <span>🔍</span>
-              <input type="range" min="1" max="5" value="2" class="w-20 accent-cyan-400 h-1 bg-white/10 rounded-lg cursor-pointer" />
+              <input id="timelineZoomSlider" type="range" min="1" max="5" value="2" oninput="setTimelineZoom(this.value)" aria-label="Timeline zoom" title="Timeline zoom" class="w-20 accent-cyan-400 h-1 bg-white/10 rounded-lg cursor-pointer" />
               <span class="text-[10px] text-cyan-300 font-semibold" id="timelineStatusLabel">Ready</span>
             </div>
           </div>
@@ -436,6 +436,12 @@
 
       <!-- RIGHT COLUMN: Clip & Framing + Extracted Viral Shorts List -->
       <section class="lg:col-span-4 sapphire-card rounded-2xl p-3 flex flex-col gap-2 h-full max-h-full min-h-0 overflow-hidden">
+                    <div class="pt-2 border-t border-white/10 space-y-2">
+              <div class="flex items-center justify-between"><label for="brollEnabledToggle" class="text-xs font-semibold text-slate-300">Optional B-Roll</label><input id="brollEnabledToggle" type="checkbox" onchange="setBrollEnabled(this.checked)" class="accent-emerald-400" /></div>
+              <div class="flex gap-2"><button type="button" onclick="document.getElementById('brollUploadInput').click()" class="flex-1 px-2 py-2 rounded-lg sapphire-input text-[11px] font-bold text-cyan-300">＋ Add B-Roll Videos</button><button type="button" onclick="clearBrollVideos()" class="px-2 py-2 rounded-lg sapphire-input text-[11px] font-bold text-slate-400">Clear</button></div>
+              <p id="brollStatus" class="text-[10px] text-slate-500">OFF · Original video only</p>
+              <p class="text-[10px] text-slate-500">ON adds muted cutaways during export; original audio stays unchanged.</p>
+            </div>
         <div class="flex-1 min-h-0 space-y-3 overflow-y-auto pr-1">
           <h2 class="text-sm font-extrabold text-white">Clip & Framing</h2>
 
@@ -443,7 +449,7 @@
           <div class="space-y-1.5">
             <div class="flex items-center justify-between gap-2">
               <label class="text-xs font-medium text-slate-300">Aspect ratio</label>
-              <select id="aspectRatioSelect" onchange="showToast('Aspect Ratio: ' + this.value)" class="w-40 px-2 py-1.5 rounded-lg sapphire-input text-[11px] font-bold text-white cursor-pointer">
+              <select id="aspectRatioSelect" onchange="changeAspectRatio(this.value)" class="w-40 px-2 py-1.5 rounded-lg sapphire-input text-[11px] font-bold text-white cursor-pointer">
                 <option value="9:16">9:16 (Shorts / Reels)</option>
                 <option value="1:1">1:1 (Square)</option>
                 <option value="16:9">16:9 (YouTube)</option>
@@ -452,7 +458,7 @@
 
             <div class="flex items-center justify-between gap-2">
               <label class="text-xs font-medium text-slate-300">Subject</label>
-              <select id="subjectTrackSelect" onchange="showToast('Subject Mode: ' + this.value)" class="w-40 px-2 py-1.5 rounded-lg sapphire-input text-[11px] font-bold text-emerald-300 cursor-pointer">
+              <select id="subjectTrackSelect" onchange="changeSubjectMode(this.value)" class="w-40 px-2 py-1.5 rounded-lg sapphire-input text-[11px] font-bold text-emerald-300 cursor-pointer">
                 <option value="Face Tracking">Face Tracking</option>
                 <option value="Center Crop">Center Crop</option>
                 <option value="Action Focus">Action Focus</option>
@@ -470,15 +476,7 @@
             </div>
 
           </div>
-            <div class="pt-2 border-t border-white/10 space-y-2">
-              <div class="flex items-center justify-between"><label for="brollEnabledToggle" class="text-xs font-semibold text-slate-300">Optional B-Roll</label><input id="brollEnabledToggle" type="checkbox" onchange="setBrollEnabled(this.checked)" class="accent-emerald-400" /></div>
-              <div class="flex gap-2"><button type="button" onclick="document.getElementById('brollUploadInput').click()" class="flex-1 px-2 py-2 rounded-lg sapphire-input text-[11px] font-bold text-cyan-300">＋ Add B-Roll Videos</button><button type="button" onclick="clearBrollVideos()" class="px-2 py-2 rounded-lg sapphire-input text-[11px] font-bold text-slate-400">Clear</button></div>
-              <p id="brollStatus" class="text-[10px] text-slate-500">OFF · Original video only</p>
-              <p class="text-[10px] text-slate-500">ON adds muted cutaways during export; original audio stays unchanged.</p>
-            </div>
-          
-
-          <!-- Extracted Viral Shorts Section -->
+<!-- Extracted Viral Shorts Section -->
           <div class="pt-2 border-t border-white/10 space-y-1.5">
             <div class="flex items-center justify-between">
               <span class="text-xs font-extrabold text-white">Viral Shorts Ready</span>
@@ -694,6 +692,7 @@
       selectedClipIdx: 0,
       captionStyle: 'hormozi',
       clipLengthSec: 30,
+      timelineZoom: 2,
       isPlaying: false,
       sampleClock: 0,
       projects: [
@@ -1560,8 +1559,10 @@
           ? 'flex-1 h-full rounded-lg emerald-cyan-btn text-slate-950 text-[11px] font-black px-2.5 flex items-center justify-between shadow cursor-pointer'
           : 'flex-1 h-full rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-[11px] font-semibold px-2.5 flex items-center justify-between cursor-pointer';
         btn.innerHTML = `<span>Short #${idx + 1}</span><span>${clip.score}%</span>`;
+        btn.style.flex = '0 0 ' + (100 / Math.max(1, proj.clips.length) * (state.timelineZoom || 2) / 2) + '%';
         track.appendChild(btn);
       });
+      setTimelineZoom(state.timelineZoom || 2);
     }
 
     // Per-clip export state is kept separately so each card shows its own progress.
@@ -1813,6 +1814,81 @@
       box.innerHTML = `<div class="${wrap}">${htmlWords}</div>`;
     }
 
+    function setTimelineZoom(value) {
+      const zoom = Math.max(1, Math.min(5, Number(value) || 2));
+      state.timelineZoom = zoom;
+      const track = document.getElementById('timelineTrackBox');
+      if (track) {
+        track.style.overflowX = 'auto';
+        track.style.justifyContent = 'flex-start';
+        Array.from(track.children).forEach(button => {
+          button.style.flex = '0 0 ' + (100 / Math.max(1, track.children.length) * zoom / 2) + '%';
+        });
+      }
+    }
+
+    function changeAspectRatio(value) {
+      const frame = document.getElementById('previewFrame');
+      if (frame) frame.style.aspectRatio = value.replace(':', ' / ');
+      showToast('Preview and exported video ratio: ' + value);
+    }
+
+    let focusX = 0.5, focusY = 0.5, focusScanBusy = false, lastFocusScan = 0;
+    let focusSampleCanvas = null, previousFocusPixels = null, faceDetector = null, faceDetectorUnavailableNotified = false;
+    function changeSubjectMode(value) {
+      focusX = 0.5; focusY = 0.5; previousFocusPixels = null;
+      if (value === 'Face Tracking' && !('FaceDetector' in window)) {
+        faceDetectorUnavailableNotified = true;
+        showToast('Face detection is not supported in this Chrome build. Center Crop will be used.');
+      } else if (value === 'Face Tracking') {
+        showToast('Face Tracking enabled for export where supported.');
+      } else {
+        showToast(value === 'Action Focus' ? 'Action Focus will follow visible motion during export.' : 'Center Crop selected.');
+      }
+    }
+
+    async function scanSubjectFocus(source, now) {
+      const mode = document.getElementById('subjectTrackSelect')?.value || 'Center Crop';
+      if (!source || source.readyState < 2 || mode === 'Center Crop') { focusX = 0.5; focusY = 0.5; return; }
+      if (mode === 'Face Tracking') {
+        if (!('FaceDetector' in window)) { focusX = 0.5; focusY = 0.5; return; }
+        try {
+          if (!faceDetector) faceDetector = new FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+          const faces = await faceDetector.detect(source);
+          if (faces.length) {
+            const box = faces[0].boundingBox;
+            const tx = (box.x + box.width / 2) / source.videoWidth;
+            const ty = (box.y + box.height / 2) / source.videoHeight;
+            focusX = focusX * 0.65 + tx * 0.35;
+            focusY = focusY * 0.65 + ty * 0.35;
+          }
+        } catch (_) { focusX = 0.5; focusY = 0.5; }
+        return;
+      }
+      try {
+        if (!focusSampleCanvas) focusSampleCanvas = document.createElement('canvas');
+        focusSampleCanvas.width = 64; focusSampleCanvas.height = 36;
+        const c = focusSampleCanvas.getContext('2d', { willReadFrequently: true });
+        c.drawImage(source, 0, 0, 64, 36);
+        const data = c.getImageData(0, 0, 64, 36).data;
+        if (previousFocusPixels) {
+          let total = 0, sx = 0, sy = 0;
+          for (let y = 2; y < 34; y += 2) for (let x = 2; x < 62; x += 2) {
+            const i = (y * 64 + x) * 4;
+            const lum = (data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114);
+            const old = (previousFocusPixels[i] * 0.299 + previousFocusPixels[i+1] * 0.587 + previousFocusPixels[i+2] * 0.114);
+            const motion = Math.max(0, Math.abs(lum - old) - 16);
+            total += motion; sx += x * motion; sy += y * motion;
+          }
+          if (total > 1200) {
+            focusX = focusX * 0.72 + (sx / total / 64) * 0.28;
+            focusY = focusY * 0.72 + (sy / total / 36) * 0.28;
+          }
+        }
+        previousFocusPixels = new Uint8ClampedArray(data);
+      } catch (_) { focusX = 0.5; focusY = 0.5; }
+    }
+
     function updateZoomPreview(value) {
       const zoom = Math.max(1, Math.min(1.4, Number(value) || 1));
       const label = document.getElementById('zoomLevelLabel');
@@ -1835,13 +1911,14 @@
       const clip = proj.clips[idx] || proj.clips[0];
       const previewVideo = document.getElementById('realVideoElement');
       const quality = document.getElementById('qualitySelect')?.value || '1080p';
+      const ratio = document.getElementById('aspectRatioSelect')?.value || '9:16';
       const dimensions = {
-        '720p': [720, 1280],
-        '1080p': [1080, 1920],
-        '2K': [1440, 2560],
-        '4K': [2160, 3840]
+        '720p': { '9:16':[720,1280], '1:1':[720,720], '16:9':[1280,720] },
+        '1080p': { '9:16':[1080,1920], '1:1':[1080,1080], '16:9':[1920,1080] },
+        '2K': { '9:16':[1440,2560], '1:1':[1440,1440], '16:9':[2560,1440] },
+        '4K': { '9:16':[2160,3840], '1:1':[2160,2160], '16:9':[3840,2160] }
       };
-      const [width, height] = dimensions[quality] || dimensions['1080p'];
+      const [width, height] = (dimensions[quality] || dimensions['1080p'])[ratio] || dimensions['1080p']['9:16'];
       if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) {
         showToast('Video export is not supported in this browser. Use updated Chrome or Edge.');
         return false;
@@ -2012,7 +2089,9 @@
               const zoomFactor = Math.max(1, Math.min(1.4, Number(document.getElementById('zoomLevelSelect')?.value || 1)));
               const cw = (width / baseScale) / zoomFactor;
               const ch = (height / baseScale) / zoomFactor;
-              ctx.drawImage(source, (sw - cw) / 2, (sh - ch) / 2, cw, ch, 0, 0, width, height);
+              const sx = Math.max(0, Math.min(sw - cw, focusX * sw - cw / 2));
+              const sy = Math.max(0, Math.min(sh - ch, focusY * sh - ch / 2));
+              ctx.drawImage(source, sx, sy, cw, ch, 0, 0, width, height);
             } else if (!proj.isRealVideo) {
               const grad = ctx.createLinearGradient(0, 0, width, height);
               grad.addColorStop(0, '#070b14'); grad.addColorStop(0.5, '#0f172a'); grad.addColorStop(1, '#064e3b');
@@ -2036,10 +2115,16 @@
 
           let startedAt = 0;
           let lastDrawAt = 0;
+          let lastFocusScanAt = 0;
           const frameInterval = 1000 / fps;
           const tick = now => {
             if (settled) return;
             if (!startedAt) startedAt = now;
+            if (now - lastFocusScanAt >= 350 && !focusScanBusy) {
+              lastFocusScanAt = now;
+              focusScanBusy = true;
+              scanSubjectFocus(sourceVideo, now).finally(() => { focusScanBusy = false; });
+            }
             if (now - lastDrawAt >= frameInterval) {
               const elapsedForBroll=Math.max(0,sourceVideo.currentTime-sourceStartTime);const showBroll=proj.brollEnabled&&brollVideos.length&&(elapsedForBroll%15)>=6&&(elapsedForBroll%15)<9;const broll=brollVideos[Math.floor(elapsedForBroll/15)%Math.max(1,brollVideos.length)];drawCover(showBroll&&broll?.readyState>=2?broll:sourceVideo);
               lastDrawAt = now;
@@ -2096,6 +2181,7 @@
     // Initialize on load
     window.addEventListener('DOMContentLoaded', () => {
       renderProjectsGrid();
+      changeAspectRatio(document.getElementById('aspectRatioSelect')?.value || '9:16');
       updateWorkflowProgress();
       requestAnimationFrame(mainStudioLoop);
     });
