@@ -301,21 +301,6 @@
           </p>
         </div>
 
-        <div id="brollControlsCard" class="shrink-0 rounded-xl border-2 border-cyan-400/60 bg-cyan-400/10 p-3 space-y-2 shadow-lg shadow-cyan-950/30">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <p class="text-sm font-extrabold text-white">B-ROLL EFFECT</p>
-              <p class="text-[10px] text-cyan-200">Optional cutaways from your uploaded video</p>
-            </div>
-            <label class="flex items-center gap-2 text-xs font-bold text-white">
-              <span>ON</span>
-              <input id="brollEnabledToggle" type="checkbox" onchange="setBrollEnabled(this.checked)" class="h-5 w-5 accent-emerald-400" />
-            </label>
-          </div>
-          <p id="brollStatus" class="text-[11px] font-semibold text-emerald-200">OFF · Original video only</p>
-          <p class="text-[10px] text-slate-300">No second upload needed. ON adds alternate cutaways from this same video; original audio stays unchanged.</p>
-        </div>
-
         <!-- Bottom Navigation Row: < Back | Start clipping > -->
         <div class="pt-3 mb-2 border-t border-white/10 flex items-center justify-between gap-2">
           <button onclick="backToProjects()" class="px-3 py-2.5 rounded-xl hover:bg-white/5 text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer">
@@ -485,6 +470,19 @@
             </div>
 
           </div>
+
+          <div id="brollControlsCard" class="rounded-xl border border-cyan-400/30 bg-[#080d1a] p-3 space-y-2">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="text-xs font-extrabold text-white">B-ROLL EFFECT</p>
+                <p class="text-[10px] text-slate-400">Optional same-video cutaways</p>
+              </div>
+              <button id="brollEnabledToggle" type="button" onclick="toggleBrollEffect()" class="px-4 py-2 rounded-lg emerald-cyan-btn text-slate-950 text-xs font-extrabold shadow cursor-pointer">OFF</button>
+            </div>
+            <p id="brollStatus" class="text-[11px] font-semibold text-slate-300">OFF · Standard Shorts</p>
+            <p class="text-[10px] text-slate-400">No second upload. Original video audio stays unchanged.</p>
+          </div>
+
 <!-- Extracted Viral Shorts Section -->
           <div class="pt-2 border-t border-white/10 space-y-1.5">
             <div class="flex items-center justify-between">
@@ -913,12 +911,18 @@
       renderProjectsGrid();
       openStudioForProject(newProj.id, false);
     }
+    function toggleBrollEffect() {
+      const p = getActiveProject();
+      if (!p) return;
+      setBrollEnabled(!p.brollEnabled);
+    }
     function setBrollEnabled(on) {
       const p = getActiveProject();
       if (!p) return;
       p.brollEnabled = !!on && !!p.isRealVideo;
       updateBrollStatus();
       if (p.brollEnabled) showToast('B-Roll effect ON for this uploaded video.');
+      else showToast('B-Roll effect OFF.');
     }
     function updateBrollStatus() {
       const p = getActiveProject();
@@ -926,7 +930,10 @@
       const status = document.getElementById('brollStatus');
       if (toggle) {
         toggle.disabled = !p?.isRealVideo;
-        toggle.checked = !!p?.brollEnabled && !!p?.isRealVideo;
+        toggle.textContent = p?.brollEnabled && p?.isRealVideo ? 'ON' : 'OFF';
+        toggle.className = p?.brollEnabled && p?.isRealVideo
+          ? 'px-4 py-2 rounded-lg emerald-cyan-btn text-slate-950 text-xs font-extrabold shadow cursor-pointer'
+          : 'px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-extrabold shadow cursor-pointer';
       }
       if (status) status.textContent = !p?.isRealVideo
         ? 'Upload a source video to enable this effect.'
