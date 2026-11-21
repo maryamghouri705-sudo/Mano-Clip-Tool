@@ -1580,31 +1580,56 @@
         const mode=document.getElementById('clipsModeSelect')?.value||'3';
         const count=mode==='5'?5:3;
         const duration=Math.max(15,Math.min(90,state.clipLengthSec||30));
-        // Fast audio-only scan: sample short points across the video instead of
-        // playing the entire five-minute file through speech recognition.
-        head.textContent='Scanning video sound…';
-        sub.textContent='Checking short audio samples for strong gaming and ASMR moments';
-        const audioStarts = await findHighActivityMoments(proj, count, duration);
         const totalDuration = Number(preview?.duration) || 0;
-        const moments = audioStarts.map((start, idx) => ({
-          start,
-          end: Math.min(totalDuration || start + duration, start + duration),
-          score: Math.max(65, 88 - idx * 3),
-          hook: '',
-          reason: 'Selected from audio peaks, loudness and sound dynamics — suitable for gameplay and ASMR without spoken dialogue.',
-          category: 'audio'
-        }));
-        if (!moments.length) throw new Error('No usable audio activity was found. Please check that your video has sound.');
-        proj.clips=moments.map((clip,idx)=>({
-          id:`browser-ai-${idx+1}`,
-          score:clip.score,
-          duration:formatTime(duration),
-          startSec:clip.start,
-          hook:clip.hook,
-          reason:clip.reason,
-          category:clip.category,
-          lines:[]
-        }));
+        let transcriptChunks = [];
+        let moments = [];
+        try {
+          head.textContent='Listening to the full video…';
+          sub.textContent='Transcribing speech and aligning words with the video timeline';
+          const transcript = await transcribeVideoInBrowser(proj.sourceFile, (percent, title, detail) => {
+            fill.style.width = Math.max(8, Math.min(92, Number(percent) || 8)) + '%';
+            head.textContent = title || 'Analysing speech…';
+            sub.textContent = detail || 'Finding useful moments';
+          });
+          transcriptChunks = Array.isArray(transcript?.chunks) ? transcript.chunks : [];
+          if (transcriptChunks.length) moments = rankTranscriptMoments(transcriptChunks, totalDuration, duration, count);
+        } catch (speechError) {
+          console.warn('Speech transcription unavailable; switching to sound analysis:', speechError);
+          head.textContent='Speech scan unavailable — checking sound…';
+          sub.textContent='Using audio activity analysis as a fallback';
+        }
+        if (!moments.length) {
+          head.textContent='Scanning video sound…';
+          sub.textContent='Finding high-activity audio moments (no speech captions will be invented)';
+          const audioStarts = await findHighActivityMoments(proj, count, duration);
+          moments = audioStarts.map((start, idx) => ({
+            start, end: Math.min(totalDuration || start + duration, start + duration),
+            score: Math.max(65, 88 - idx * 3), hook: 'Sound moment ' + (idx + 1),
+            reason: 'Selected from audio peaks, loudness and sound dynamics.',
+            category: 'audio', lines: []
+          }));
+        }
+        if (!moments.length) throw new Error('No usable speech or audio moments were found. Please check the video sound.');
+        proj.clips=moments.map((clip,idx)=>{
+          const startSec = Math.max(0, Number(clip.start) || 0);
+          const endSec = Math.min(totalDuration || startSec + duration, Number(clip.end) || startSec + duration);
+          const lines = transcriptChunks.filter(item => {
+            const ts = item.timestamp || [0, 0];
+            return Number(ts[1] ?? 0) > startSec && Number(ts[0] ?? 0) < endSec;
+          }).map(item => {
+            const ts = item.timestamp || [startSec, endSec];
+            const lineStart = Math.max(startSec, Number(ts[0]) || startSec);
+            const lineEnd = Math.min(endSec, Number(ts[1]) || endSec);
+            const words = String(item.text || '').trim().split(/\\s+/).filter(Boolean);
+            return words.length ? { startSec: lineStart, endSec: Math.max(lineStart + 0.15, lineEnd), words, hi: Math.max(0, words.length - 1) } : null;
+          }).filter(Boolean);
+          return {
+            id:`browser-ai-${idx+1}`, score:clip.score,
+            duration:formatTime(Math.max(1, endSec - startSec)), startSec, endSec,
+            hook:clip.hook || (lines[0]?.words?.join(' ') || 'Sound moment ' + (idx + 1)),
+            reason:clip.reason, category:clip.category, lines
+          };
+        });
         fill.style.width='100%';
         head.textContent='Your clip moments are ready';
         sub.textContent=`Scanned audio samples across ${formatTime(totalDuration)} · selected sound moments`;
@@ -1873,22 +1898,27 @@
 
     function renderLiveCaptions(t, clip, speakAloud) {
       const box = document.getElementById('playerCaptionsBox');
-      // Demo captions are not a transcript. Keep uploaded footage free of invented overlay text.
-      if (!speakAloud) {
-        if (box.innerHTML) box.innerHTML = '';
-        box.dataset.key = '';
-        return;
+      const lines = Array.isArray(clip?.lines) ? clip.lines : [];
+      let lineObj = null, lineIdx = -1, wordIdx = 0;
+      if (speakAloud) {
+        if (!lines.length) { box.innerHTML = ''; box.dataset.key = ''; return; }
+        lineIdx = Math.floor(t / 2.6) % lines.length;
+        lineObj = lines[lineIdx];
+        wordIdx = Math.floor((t % 2.6) / (2.6 / Math.max(1, lineObj.words.length)));
+      } else {
+        lineIdx = lines.findIndex(line => t >= line.startSec && t <= line.endSec);
+        if (lineIdx < 0) { if (box.innerHTML) box.innerHTML = ''; box.dataset.key = ''; return; }
+        lineObj = lines[lineIdx];
+        const span = Math.max(0.1, lineObj.endSec - lineObj.startSec);
+        const progress = Math.max(0, Math.min(0.999, (t - lineObj.startSec) / span));
+        wordIdx = Math.min(lineObj.words.length - 1, Math.floor(progress * lineObj.words.length));
       }
-      const lines = clip.lines;
-      const lineIdx = Math.floor(t / 2.6) % lines.length;
-      const lineObj = lines[lineIdx];
-      const wordIdx = Math.floor((t % 2.6) / (2.6 / lineObj.words.length));
-
-      // Trigger real spoken English voice + chime on sample project when playing!
+      if (!lineObj || !Array.isArray(lineObj.words) || !lineObj.words.length) {
+        box.innerHTML = ''; box.dataset.key = ''; return;
+      }
       if (speakAloud && state.isPlaying) {
         audioEngine.speakCaptionLine(lineObj.words.join(' '), `${clip.id}-${lineIdx}`);
       }
-
       const renderKey = `${state.captionStyle}-${clip.id}-${lineIdx}-${wordIdx}`;
       if (box.dataset.key === renderKey) return;
       box.dataset.key = renderKey;
@@ -2219,7 +2249,12 @@
               ctx.textAlign = 'center';
               ctx.fillText('MANO CLIP TOOL', width / 2, height * 0.45);
             }
-            const line = clip.lines[0]?.words?.join(' ') || '';
+            const activeCaptionLine = Array.isArray(clip.lines)
+              ? (proj.isRealVideo
+                  ? clip.lines.find(item => sourceVideo.currentTime >= item.startSec && sourceVideo.currentTime <= item.endSec)
+                  : clip.lines[0])
+              : null;
+            const line = activeCaptionLine?.words?.join(' ') || '';
             if (line.trim()) {
               ctx.textAlign = 'center';
               ctx.fillStyle = 'rgba(0,0,0,.68)';
