@@ -6,7 +6,7 @@
   <title>Mano Clip Tool — AI Viral Clipping Studio</title>
   <link rel="icon" type="image/jpeg" sizes="192x192" href="./mano-icon-192.jpg" />
   <link rel="apple-touch-icon" href="./mano-icon-192.jpg" />
-  <link rel="manifest" href="./manifest.webmanifest?v=3" />
+  <link rel="manifest" href="./manifest.webmanifest?v=4" />
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -436,12 +436,24 @@
 
       <!-- RIGHT COLUMN: Clip & Framing + Extracted Viral Shorts List -->
       <section class="lg:col-span-4 sapphire-card rounded-2xl p-3 flex flex-col gap-2 h-full max-h-full min-h-0 overflow-hidden">
-                    <div class="pt-2 border-t border-white/10 space-y-2">
-              <div class="flex items-center justify-between"><label for="brollEnabledToggle" class="text-xs font-semibold text-slate-300">Optional B-Roll</label><input id="brollEnabledToggle" type="checkbox" onchange="setBrollEnabled(this.checked)" class="accent-emerald-400" /></div>
-              <div class="flex gap-2"><button type="button" onclick="document.getElementById('brollUploadInput').click()" class="flex-1 px-2 py-2 rounded-lg sapphire-input text-[11px] font-bold text-cyan-300">＋ Add B-Roll Videos</button><button type="button" onclick="clearBrollVideos()" class="px-2 py-2 rounded-lg sapphire-input text-[11px] font-bold text-slate-400">Clear</button></div>
-              <p id="brollStatus" class="text-[10px] text-slate-500">OFF · Original video only</p>
-              <p class="text-[10px] text-slate-500">ON adds muted cutaways during export; original audio stays unchanged.</p>
+        <div id="brollControlsCard" class="shrink-0 rounded-xl border-2 border-cyan-400/60 bg-cyan-400/10 p-3 space-y-2 shadow-lg shadow-cyan-950/30">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="text-sm font-extrabold text-white">B-ROLL VIDEO</p>
+              <p class="text-[10px] text-cyan-200">Optional extra video cutaways</p>
             </div>
+            <label class="flex items-center gap-2 text-xs font-bold text-white">
+              <span>ON</span>
+              <input id="brollEnabledToggle" type="checkbox" onchange="setBrollEnabled(this.checked)" class="h-5 w-5 accent-emerald-400" />
+            </label>
+          </div>
+          <div class="flex gap-2">
+            <button type="button" onclick="document.getElementById('brollUploadInput').click()" class="flex-1 px-3 py-2.5 rounded-lg bg-cyan-300 text-slate-950 text-xs font-extrabold">＋ ADD B-ROLL VIDEOS</button>
+            <button type="button" onclick="clearBrollVideos()" class="px-3 py-2.5 rounded-lg sapphire-input text-xs font-bold text-slate-200">CLEAR</button>
+          </div>
+          <p id="brollStatus" class="text-[11px] font-semibold text-emerald-200">OFF · Original video only</p>
+          <p class="text-[10px] text-slate-300">Turn ON to insert muted cutaways during export. Original video audio remains.</p>
+        </div>
         <div class="flex-1 min-h-0 space-y-3 overflow-y-auto pr-1">
           <h2 class="text-sm font-extrabold text-white">Clip & Framing</h2>
 
