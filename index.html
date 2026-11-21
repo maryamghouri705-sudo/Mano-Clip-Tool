@@ -900,32 +900,81 @@
     // =========================================================================
     // 5. UPLOAD REAL VIDEO & CREATE PROJECT
     // =========================================================================
-    function handleRealVideoUpload(event) {
-      const file = event.target.files[0];
+    async function handleRealVideoUpload(event) {
+      const input = event?.target;
+      const file = input?.files?.[0];
       if (!file) return;
-      closeNewProjectModal();
+
+      // Clear the picker immediately so selecting the same file again also works.
+      if (input) input.value = '';
+      const supportedExtension = /\.(mp4|m4v|mov|webm|ogv|ogg)$/i.test(file.name || '');
+      if (!(file.type || '').startsWith('video/') && !supportedExtension) {
+        showToast('Please choose a supported video file (MP4, MOV or WebM).', 9000);
+        return;
+      }
+      if (!file.size) {
+        showToast('This video file is empty. Please choose another file.', 9000);
+        return;
+      }
+
       audioEngine.unlock();
-
       const objectUrl = URL.createObjectURL(file);
-      const nextCode = String(state.projects.length + 1).padStart(3, '0');
-      const cleanTitle = file.name.replace(/\.[^/.]+$/, '');
+      const probe = document.createElement('video');
+      probe.preload = 'metadata';
+      probe.muted = true;
+      probe.playsInline = true;
+      probe.src = objectUrl;
 
-      const newProj = {
-        id: 'proj-' + Date.now(), code: nextCode, title: nextCode,
-        subtitle: cleanTitle, duration: 'Auto', aspect: '9:16',
-        isRealVideo: true, videoUrl: objectUrl, sourceFile: file,
-        brollItems: [], brollEnabled: false,
-        workflow: { video: false, clips: false, edit: false, rendering: false, render: false, renderError: false },
-        clips: [
-          { id: 'rc-1', score: 0, duration: '0:30', startSec: 0, hook: 'Analysing high-activity moment…', lines: [] },
-          { id: 'rc-2', score: 0, duration: '0:30', startSec: 30, hook: 'Analysing high-activity moment…', lines: [] },
-          { id: 'rc-3', score: 0, duration: '0:30', startSec: 60, hook: 'Analysing high-activity moment…', lines: [] }
-        ]
-      };
+      try {
+        showToast('Checking uploaded video…');
+        await new Promise((resolve, reject) => {
+          let settled = false;
+          const finish = (error) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            probe.onloadedmetadata = null;
+            probe.onerror = null;
+            if (error) reject(error); else resolve();
+          };
+          const timer = setTimeout(() => finish(new Error('Video check timed out. Try a smaller MP4 or WebM file.')), 30000);
+          probe.onloadedmetadata = () => {
+            if (!Number.isFinite(probe.duration) || probe.duration <= 0 || !probe.videoWidth || !probe.videoHeight) {
+              finish(new Error('The selected file does not contain a readable video track.'));
+            } else finish();
+          };
+          probe.onerror = () => finish(new Error('This video format or codec could not be opened in your browser. Try MP4 (H.264).'));
+          probe.load();
+        });
 
-      state.projects.unshift(newProj);
-      renderProjectsGrid();
-      openStudioForProject(newProj.id, false);
+        const nextCode = String(state.projects.length + 1).padStart(3, '0');
+        const cleanTitle = file.name.replace(/\.[^/.]+$/, '');
+        const newProj = {
+          id: 'proj-' + Date.now(), code: nextCode, title: nextCode,
+          subtitle: cleanTitle, duration: formatTime(Math.floor(probe.duration)), aspect: '9:16',
+          isRealVideo: true, videoUrl: objectUrl, sourceFile: file,
+          brollItems: [], brollEnabled: false,
+          workflow: { video: true, clips: false, edit: false, broll: false, rendering: false, render: false, renderError: false, stage: 1 },
+          clips: [
+            { id: 'rc-1', score: 0, duration: '0:30', startSec: 0, hook: 'Ready for clip analysis', lines: [] },
+            { id: 'rc-2', score: 0, duration: '0:30', startSec: 30, hook: 'Ready for clip analysis', lines: [] },
+            { id: 'rc-3', score: 0, duration: '0:30', startSec: 60, hook: 'Ready for clip analysis', lines: [] }
+          ]
+        };
+
+        closeNewProjectModal();
+        state.projects.unshift(newProj);
+        renderProjectsGrid();
+        openStudioForProject(newProj.id, false);
+        showToast('Video uploaded and checked successfully.');
+      } catch (err) {
+        URL.revokeObjectURL(objectUrl);
+        console.error('Video upload error:', err);
+        showToast(err.message || 'Could not open this video. Please try another file.', 10000);
+      } finally {
+        probe.removeAttribute('src');
+        probe.load();
+      }
     }
     function toggleBrollEffect() {
       const p = getActiveProject();
