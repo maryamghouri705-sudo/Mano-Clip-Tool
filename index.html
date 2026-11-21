@@ -301,6 +301,21 @@
           </p>
         </div>
 
+        <div id="brollControlsCard" class="shrink-0 rounded-xl border-2 border-cyan-400/60 bg-cyan-400/10 p-3 space-y-2 shadow-lg shadow-cyan-950/30">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="text-sm font-extrabold text-white">B-ROLL EFFECT</p>
+              <p class="text-[10px] text-cyan-200">Optional cutaways from your uploaded video</p>
+            </div>
+            <label class="flex items-center gap-2 text-xs font-bold text-white">
+              <span>ON</span>
+              <input id="brollEnabledToggle" type="checkbox" onchange="setBrollEnabled(this.checked)" class="h-5 w-5 accent-emerald-400" />
+            </label>
+          </div>
+          <p id="brollStatus" class="text-[11px] font-semibold text-emerald-200">OFF · Original video only</p>
+          <p class="text-[10px] text-slate-300">No second upload needed. ON adds alternate cutaways from this same video; original audio stays unchanged.</p>
+        </div>
+
         <!-- Bottom Navigation Row: < Back | Start clipping > -->
         <div class="pt-3 mb-2 border-t border-white/10 flex items-center justify-between gap-2">
           <button onclick="backToProjects()" class="px-3 py-2.5 rounded-xl hover:bg-white/5 text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer">
@@ -436,20 +451,6 @@
 
       <!-- RIGHT COLUMN: Clip & Framing + Extracted Viral Shorts List -->
       <section class="lg:col-span-4 sapphire-card rounded-2xl p-3 flex flex-col gap-2 h-full max-h-full min-h-0 overflow-hidden">
-        <div id="brollControlsCard" class="shrink-0 rounded-xl border-2 border-cyan-400/60 bg-cyan-400/10 p-3 space-y-2 shadow-lg shadow-cyan-950/30">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <p class="text-sm font-extrabold text-white">B-ROLL EFFECT</p>
-              <p class="text-[10px] text-cyan-200">Optional cutaways from your uploaded video</p>
-            </div>
-            <label class="flex items-center gap-2 text-xs font-bold text-white">
-              <span>ON</span>
-              <input id="brollEnabledToggle" type="checkbox" onchange="setBrollEnabled(this.checked)" class="h-5 w-5 accent-emerald-400" />
-            </label>
-          </div>
-          <p id="brollStatus" class="text-[11px] font-semibold text-emerald-200">OFF · Original video only</p>
-          <p class="text-[10px] text-slate-300">No second upload needed. ON adds alternate cutaways from this same video; original audio stays unchanged.</p>
-        </div>
         <div class="flex-1 min-h-0 space-y-3 overflow-y-auto pr-1">
           <h2 class="text-sm font-extrabold text-white">Clip & Framing</h2>
 
